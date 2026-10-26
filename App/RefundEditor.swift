@@ -9,6 +9,9 @@ struct RefundEditor: View {
     @State private var note = ""
     @State private var error: String?
     @State private var confirm = false
+    @State private var leaving = false
+    @State private var initialDate = LedgerDate.string(Date())
+    private var dirty: Bool { !amount.isEmpty || !note.isEmpty || date != initialDate }
     @FocusState private var inputFocused: Bool
     private var entry: Entry? { store.ledger.entries.first { $0.id == entryID } }
     var body: some View {
@@ -34,7 +37,7 @@ struct RefundEditor: View {
             }.ledgerCanvas().navigationTitle("记录退款")
                 .safeAreaInset(edge: .top) {
                     HStack {
-                        Button("取消") { dismiss() }
+                        Button("取消") { inputFocused = false; if dirty { leaving = true } else { dismiss() } }
                         Spacer()
                         Button("确认并保存") { inputFocused = false; confirm = true }
                             .disabled(entry == nil || entry?.netAmount == 0)
@@ -45,7 +48,7 @@ struct RefundEditor: View {
                     Button("保存退款") { save() }
                 } message: { Text("保存后将减少原消费所属周期的支出。") }
                 .alert("未保存", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(L10n.text(error ?? "")) }
-        }
+        }.modifier(UnsavedChangesGuard(dirty: dirty, requested: $leaving) { dismiss() })
     }
     private func save() {
         do {

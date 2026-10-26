@@ -17,6 +17,7 @@ struct StatementEditor: View {
     @State private var confirmed = false
     @State private var error: String?
     @State private var saved = false
+    @State private var leaving = false
     @State private var allowDuplicates = false
     init(result: StatementResult, ledger: Ledger) {
         self.result = result
@@ -66,12 +67,12 @@ struct StatementEditor: View {
             }.ledgerCanvas().scrollDismissesKeyboard(.interactively)
                 .navigationTitle("账单批量核对")
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button("关闭") { if !rows.isEmpty && !saved { leaving = true } else { dismiss() } } }
                     ToolbarItem(placement: .confirmationAction) { Button("保存所选 \(count) 笔") { save() }.disabled(!confirmed || count == 0 || !store.ready) }
                 }
                 .alert("未保存", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(L10n.text(error ?? "")) }
                 .alert("已保存所选消费", isPresented: $saved) { Button("完成") { dismiss() } } message: { Text("已保存 \(count) 笔消费，可在对应月份查看。") }
-        }
+        }.modifier(UnsavedChangesGuard(dirty: !rows.isEmpty && !saved, requested: $leaving) { dismiss() })
     }
     private func save() {
         guard confirmed else { return }

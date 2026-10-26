@@ -2,6 +2,26 @@ import XCTest
 import UIKit
 
 final class LocalLedgerUITests: XCTestCase {
+    @MainActor func testUnsavedEntryExitProtection() throws {
+        let app = XCUIApplication(); app.launchArguments += ["-appLanguage", "zh-Hans"]; app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        app.buttons["手动记一笔"].tap()
+        let amount = app.textFields["金额（USD，例如 12.50）"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        amount.tap(); amount.typeText("19.25")
+        app.buttons["关闭"].tap()
+        XCTAssertTrue(app.alerts["放弃未保存的修改？"].waitForExistence(timeout: 5))
+        app.alerts.buttons["继续编辑"].tap()
+        XCTAssertEqual(amount.value as? String, "19.25")
+        XCTAssertTrue(app.staticTexts["entry.period"].exists)
+        app.buttons["关闭"].tap(); app.alerts.buttons["放弃修改"].tap()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 5))
+        app.buttons["手动记一笔"].tap()
+        XCTAssertEqual(amount.value as? String, "金额（USD，例如 12.50）")
+        app.buttons["关闭"].tap()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 5))
+    }
+
     @MainActor func testEditorSurvivesBackgroundWithoutReplayingOpening() throws {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 8))
@@ -401,6 +421,10 @@ extension LocalLedgerUITests {
         app.buttons["记录退款"].tap()
         let refund = app.textFields["refund.amount"]
         XCTAssertTrue(refund.waitForExistence(timeout: 5)); refund.tap(); refund.typeText("5")
+        app.buttons["取消"].tap()
+        XCTAssertTrue(app.alerts["放弃未保存的修改？"].waitForExistence(timeout: 5))
+        app.alerts.buttons["继续编辑"].tap()
+        XCTAssertEqual(refund.value as? String, "5")
         app.buttons["确认并保存"].tap()
         XCTAssertTrue(app.alerts.buttons["保存退款"].waitForExistence(timeout: 5))
         app.alerts.buttons["保存退款"].tap()

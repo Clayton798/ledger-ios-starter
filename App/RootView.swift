@@ -133,7 +133,7 @@ struct EntriesView: View {
                     }.disabled(busy || !store.ready)
                     Divider()
                     if busy { ProgressView("正在设备上识别…").padding(.vertical, 12) }
-                    EditorialSectionTitle(title: "本期记录", index: "01").padding(.top, 32)
+                    EditorialSectionTitle(title: allPeriods ? "全部记录" : "本期记录", index: "01").padding(.top, 32)
                     if !allPeriods { MonthSelector(date: $date).padding(.vertical, 10) }
                     if allPeriods { Text("正在查找所有周期的记录").font(.caption).foregroundStyle(.secondary).padding(.vertical, 10) }
                     HStack(spacing: 10) {
@@ -157,7 +157,13 @@ struct EntriesView: View {
                         Text(L10n.format("净支出 %@", Money.display(Ledger.netTotal(of: rows))))
                     }.font(.caption).foregroundStyle(.secondary).padding(.bottom, 12).accessibilityIdentifier("entries.summary")
                     if showVoided { Text("合计已扣退款，不包含作废记录。").font(.caption).foregroundStyle(.secondary).padding(.bottom, 12) }
-                    if rows.isEmpty { ContentUnavailableView(LocalizedStringKey(search.isEmpty ? "从第一笔开始" : "没有找到匹配记录"), systemImage: search.isEmpty ? "square.and.pencil" : "magnifyingglass", description: Text(L10n.text(search.isEmpty ? "选择付款截图，或手动记录今天的消费。" : "试试其他商家、分类或备注关键词。"))) }
+                    if rows.isEmpty {
+                        ContentUnavailableView(LocalizedStringKey(search.isEmpty ? "当前范围暂无记录" : "没有找到匹配记录"), systemImage: "magnifyingglass", description: Text(L10n.text("可以更换周期、查看全部记录，或清除搜索条件。")))
+                        HStack {
+                            if !search.isEmpty { Button("清除搜索") { search = "" } }
+                            if !allPeriods { Button("查看全部记录") { allPeriods = true } }
+                        }.font(.subheadline).padding(.bottom, 20)
+                    }
                     ForEach(rows) { entry in
                         Button { draft = Draft(entry: entry) } label: {
                             HStack(alignment: .firstTextBaseline, spacing: 16) {

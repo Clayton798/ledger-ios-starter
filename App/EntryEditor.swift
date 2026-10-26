@@ -4,6 +4,11 @@ struct EntryEditor: View {
     @EnvironmentObject private var store: LedgerStore
     @Environment(\.dismiss) private var dismiss
     let draft: Draft
+    private let initialValues: [String]
+    @State private var leaving = false
+    @FocusState private var inputFocused: Bool
+    private var dirty: Bool { !blocked && savedMessage == nil && (draft.receipt != nil || [amount, merchant, date, note, category, String(currencyConfirmed)] != initialValues) }
+    private func close() { inputFocused = false; if dirty { leaving = true } else { dismiss() } }
     @State private var amount: String
     @State private var merchant: String
     @State private var date: String
@@ -27,6 +32,7 @@ struct EntryEditor: View {
         _date = State(initialValue: draft.entry?.date ?? (receipt == nil ? LedgerDate.string(Date()) : (receipt!.dates.count == 1 ? receipt!.dates[0] : "")))
         _category = State(initialValue: draft.entry?.category ?? ledger.suggestedCategory(for: receipt?.merchant ?? ""))
         _currencyConfirmed = State(initialValue: draft.entry != nil || receipt == nil || receipt?.explicitUSD == true)
+        initialValues = [_amount.wrappedValue, _merchant.wrappedValue, _date.wrappedValue, _note.wrappedValue, _category.wrappedValue, String(_currencyConfirmed.wrappedValue)]
     }
     var blocked: Bool { draft.receipt?.blockedReason != nil || draft.entry?.voidedAt != nil }
     var body: some View {
@@ -52,13 +58,17 @@ struct EntryEditor: View {
                         Text("已支出 \(amount) USD · \(L10n.merchant(merchant))").font(.subheadline)
                         if L10n.merchant(merchant) != merchant { Text("原商家名：\(merchant)").font(.caption).foregroundStyle(.secondary) }
                     }
-                    TextField("金额（USD，例如 12.50）", text: $amount).keyboardType(.decimalPad)
-                    TextField("商家", text: $merchant)
+                    TextField("金额（USD，例如 12.50）", text: $amount).keyboardType(.decimalPad).focused($inputFocused)
+                    TextField("商家", text: $merchant).focused($inputFocused)
                         .onChange(of: merchant) { _, value in
                             if draft.entry == nil && !categoryWasChosen { category = store.ledger.suggestedCategory(for: value) }
                         }
-                    TextField("日期 YYYY-MM-DD", text: $date).keyboardType(.numbersAndPunctuation)
-                    TextField("备注（可选）", text: $note)
+                    TextField("日期 YYYY-MM-DD", text: $date).keyboardType(.numbersAndPunctuation).focused($inputFocused)
+                    if LedgerDate.valid(date.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                        Text(L10n.format("计入周期：%@", L10n.period(store.ledger.settings.cycleKey(for: date.trimmingCharacters(in: .whitespacesAndNewlines)), settings: store.ledger.settings)))
+                            .font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("entry.period")
+                    }
+                    TextField("备注（可选）", text: $note).focused($inputFocused)
                     Picker("分类", selection: Binding(get: { category }, set: { category = $0; categoryWasChosen = true })) { ForEach(store.ledger.visibleCategories(selected: category), id: \.self) { Text(L10n.text(Categories.title($0))).tag($0) } }.accessibilityIdentifier("entry.category").accessibilityValue(L10n.text(Categories.title(category)))
                     Button("按商家建议分类") { categoryWasChosen = false; category = store.ledger.suggestedCategory(for: merchant) }
                     Text(store.ledger.rememberedCategory(for: merchant) == nil ? "保存后会记住此商家的分类，下次自动填好。" : "已参考你上次保存的同名商家分类，仍可修改。")
@@ -91,7 +101,7 @@ struct EntryEditor: View {
                                 }
                             }
                             Button("记录退款") { showRefund = true }.disabled(current.netAmount == 0)
-                            Button("返回账目") { dismiss() }
+                            Button("返回账目") { close() }
                         }
                         Section { Button("作废此笔", role: .destructive) { askVoid = true } }
                     }
@@ -109,10 +119,10 @@ struct EntryEditor: View {
                     }
                 } message: { Text("退款记录仍保留，原消费的实际支出会相应恢复。") }
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
+                    ToolbarItem(placement: .cancellationAction) { Button("关闭") { close() } }
                     if !blocked {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("确认并保存") { prepareSave() }.disabled(!currencyConfirmed || !store.ready)
+                            Button("确认并保存") { inputFocused = false; prepareSave() }.disabled(!currencyConfirmed || !store.ready)
                         }
                     }
                 }
@@ -128,7 +138,7 @@ struct EntryEditor: View {
                 .alert("已保存", isPresented: Binding(get: { savedMessage != nil }, set: { if !$0 { savedMessage = nil; dismiss() } })) {
                     Button("完成") { dismiss() }
                 } message: { Text(L10n.text(savedMessage ?? "")) }
-        }
+        }.modifier(UnsavedChangesGuard(dirty: dirty, requested: $leaving) { dismiss() })
     }
     func prepareSave() {
         guard currencyConfirmed, !blocked else { error = "请确认美元币种；退款或其他币种不能保存。"; return }

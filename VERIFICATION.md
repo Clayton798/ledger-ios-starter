@@ -69,3 +69,15 @@ Settings records the time only after a successful export of the current ledger. 
 65 core tests pass, including seven-day reminder boundaries, future timestamps, leap February, and 9-day and 51-day transition periods. The cycle/independent-budget UI case and the overview/backup-status UI case passed. The latter was rerun successfully after the final copy and date-locale changes. The system file picker export completion was code-reviewed but not automated in this follow-up. The refund UI case initially exposed a save button that was not hittable with the keyboard visible; a fixed top action row now clears focus, and the partial-refund/save/relaunch/correction case passed after the fix.
 
 The signed device build succeeded. After device access became available, a fresh pre-install ledger backup was saved, the build was installed and launched successfully, and the full post-install ledger compared equal to the pre-install snapshot. Private ledger snapshots are kept outside this repository.
+
+## Everyday-use review: protect input and clarify context
+
+Reviewed entry, refund, batch review, search, budget and persistence boundaries. The concrete gap was that transaction sheets could discard unsaved work even though budgets already had an exit decision. A shared `UnsavedChangesGuard` now prevents interactive dismissal while there is unsaved work and offers continue/discard on explicit close. Blank manual entries still close immediately. Receipt review also asks before leaving its recognized content. This protects the current editing session; it does not claim recovery after process termination.
+
+Entry forms now preview the destination budget period next to the date. Empty search results explain the current scope and offer clearing the search or viewing all periods; the section heading also follows the scope. These changes keep the existing typography, palette and layout hierarchy. Added text is localized in Chinese, English and French.
+
+Design reference: [Apple HIG — Entering data](https://developer.apple.com/design/human-interface-guidelines/entering-data), particularly clarity about requested data and reducing input mistakes.
+
+65 core tests passed unchanged. Focused UI tests passed for cross-period search, unsaved manual-entry continue/discard and reopening a blank form, and partial refund persistence/correction. Further regression and device verification results follow below. No new financial schema or calculation changes were introduced.
+
+Final focused regression passed: language switching/relaunch, manual entry/save/relaunch/void, and partial refund with cancel → continue-editing → save → relaunch → correction. The signed build was installed and launched on the connected phone; a fresh complete before/after ledger comparison matched. The batch-review exit guard shares the same component but its photo-picker path was not rerun in this follow-up. OCR accuracy on unfamiliar images and recovery of unsaved input after process termination remain explicit limitations.

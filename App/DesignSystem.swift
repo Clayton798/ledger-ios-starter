@@ -170,3 +170,17 @@ private struct LedgerPrivacyProtection: ViewModifier {
 extension View {
     func privacyProtected() -> some View { modifier(LedgerPrivacyProtection()) }
 }
+
+// Shared exit policy for transaction editors: explicit discard, never a silent swipe loss.
+struct UnsavedChangesGuard: ViewModifier {
+    let dirty: Bool
+    @Binding var requested: Bool
+    let discard: () -> Void
+    func body(content: Content) -> some View {
+        content.interactiveDismissDisabled(dirty)
+            .alert("放弃未保存的修改？", isPresented: $requested) {
+                Button("继续编辑", role: .cancel) {}
+                Button("放弃修改", role: .destructive, action: discard)
+            } message: { Text("关闭后，本次尚未保存的内容将丢失。已保存的账目不会改变。") }
+    }
+}
