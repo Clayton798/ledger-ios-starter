@@ -51,6 +51,7 @@ struct LedgerMark: View {
 }
 struct LedgerCover: View {
     var animated = false
+    var departing = false
     var onFinished: (() -> Void)? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var progress: CGFloat = 0
@@ -58,6 +59,8 @@ struct LedgerCover: View {
     var body: some View {
         ZStack {
             LedgerStyle.canvas.ignoresSafeArea()
+                .opacity(departing ? 0 : 1)
+                .animation(reduceMotion ? nil : .timingCurve(0.22, 0.0, 0.18, 1.0, duration: 0.5).delay(0.12), value: departing)
             VStack(spacing: 14) {
                 HandwrittenLedger(progress: animated && !reduceMotion ? progress : 1)
                     .frame(width: 268, height: 134)
@@ -65,7 +68,10 @@ struct LedgerCover: View {
                     Rectangle().fill(LedgerStyle.accent.opacity(0.32)).frame(width: 32, height: 0.5)
                     Text("日 常 · 有 序").font(.system(size: 10)).tracking(3).foregroundStyle(.secondary)
                 }.opacity(subtitleVisible || !animated || reduceMotion ? 1 : 0)
-            }.accessibilityElement(children: .ignore).accessibilityLabel("账本")
+            }
+            .opacity(departing ? 0 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: departing)
+            .accessibilityElement(children: .ignore).accessibilityLabel("账本")
         }.task {
             guard animated else { progress = 1; subtitleVisible = true; return }
             guard !reduceMotion else { progress = 1; subtitleVisible = true; onFinished?(); return }

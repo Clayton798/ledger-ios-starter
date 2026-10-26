@@ -5,18 +5,25 @@ import SwiftUI
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var opening = true
+    @State private var revealing = false
     var body: some Scene {
         WindowGroup {
             ZStack {
                 LedgerStyle.canvas.ignoresSafeArea()
                 RootView().environmentObject(store)
-                    .opacity(opening ? 0 : 1)
                     .allowsHitTesting(!opening)
                     .accessibilityHidden(opening)
                 if opening && scenePhase == .active {
-                    LedgerCover(animated: true) {
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.4)) { opening = false }
-                    }.transition(.opacity).accessibilityIdentifier("opening.cover")
+                    LedgerCover(animated: true, departing: revealing) {
+                        guard !revealing else { return }
+                        if reduceMotion { opening = false; return }
+                        revealing = true
+                    }.accessibilityIdentifier("opening.cover")
+                        .task(id: revealing) {
+                            guard revealing else { return }
+                            do { try await Task.sleep(for: .milliseconds(650)) } catch { return }
+                            opening = false
+                        }
                 }
             }
                 .overlay {
