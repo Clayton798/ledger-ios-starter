@@ -1,0 +1,52 @@
+# Ledger · 账本
+
+一个安静、简洁的 iPhone 本地美元记账应用。SwiftUI 界面、离线截图识别、逐笔核对和分类预算。首次打开从空白账本开始，不包含任何个人消费或预设预算。
+
+## 能做什么
+
+- 手动记账，以及单笔付款截图、多笔账单截图的离线识别。
+- 保存前核对金额、商家、日期和分类；疑似重复默认不选。
+- 商家分类记忆、搜索、修改和作废记录。
+- 周期预算、分类环形图、条形图和每日趋势。
+- 将账本保存为文件，以及合并找回已有文件。
+- 原创 Ledger 手写图标与逐笔开场；支持减少动态效果。
+
+## 开始使用
+
+需要 Mac、支持 Swift 6 的 Xcode，以及 iOS 17 或以上的模拟器或 iPhone。
+
+1. 下载本仓库，打开 `LocalLedger.xcodeproj`。
+2. 选择 `LocalLedger` scheme 和一个 iPhone 模拟器，点击 Run。
+3. 首次使用按引导填写自己的分类预算，也可以先跳过。
+4. 真机运行时，在 Signing & Capabilities 选择自己的开发团队，并把 Bundle Identifier 改成自己的唯一标识，再连接手机运行。具体信任和开发者模式要求以 Xcode 与手机提示为准。
+
+本仓库提供源码，不是 App Store 安装包。GitHub 下载源码不会直接把应用安装到 iPhone；每位使用者需要自行签名，或等待未来另行提供的分发版本。
+
+## 当前边界
+
+- 仅支持美元正数支出，不自动换汇，不连接银行。
+- 预算周期固定为每月 **22 日至下月 21 日**。
+- 退款、收入和多币种尚未实现；不要把它们作为普通支出导入。
+- 截图识别可能出错，保存前必须核对；相同商家、日期、金额可能是不同交易。
+- 界面目前以中文为主。
+
+## 数据与备份
+
+账本在设备本地保存，不上传开发者服务器，不包含外部 AI API。原始截图不作为账本附件保留。系统图片选择器可能按你的操作从 iCloud 下载图片。
+
+在“设置”中选择“保存一份账本副本”保留备份。找回文件会合并记录，并使用文件中的预算；请阅读确认提示。卸载应用或更换设备前务必先备份。本应用不提供自动云同步。
+
+## 开发与验证
+
+```sh
+swift test
+xcodebuild -project LocalLedger.xcodeproj -scheme LocalLedger -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+```
+
+`Sources/LedgerCore` 包含金额、周期、识别解析、去重和备份逻辑；`Tests` 是独立核心测试。`UITests` 包含交互回归测试，其中图表场景需要模拟器先有虚构记录，请勿在真实个人账本上运行测试。
+
+`App` 包含界面、离线 OCR 和存储；`scripts/generate_project.py` 可重新生成 Xcode 工程和图标。修改前请先阅读脚本，不要用生成脚本覆盖自己调整过的工程配置。
+
+## 许可
+
+目前源码公开供查看，应用源码尚未授予开源再利用许可证。字体单独遵循 SIL Open Font License，详见 `NOTICE.txt` 和 `App/Fonts/OFL.txt`。

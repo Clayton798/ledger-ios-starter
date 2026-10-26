@@ -1,0 +1,6 @@
+Ledger source is publicly available for inspection. No license for the application source code has been granted yet. Public visibility does not itself grant reuse or redistribution rights.
+
+Bundled Noto Serif SC font is unmodified and separately licensed under SIL Open Font License 1.1.
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://github.com/google/fonts/tree/main/ofl/notoserifsc
+Full license: App/Fonts/OFL.txt
