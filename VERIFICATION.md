@@ -53,3 +53,9 @@ Added current/all-period search, matching record count and net spending, and a r
 63 core tests pass. Three focused interface tests passed for cross-period scope and return-to-current, the existing search/guide flow, and shared period navigation/background return. The signed build was installed and launched, and the complete before/after device ledger snapshots matched. No private snapshots are in this repository.
 
 Design references: [Actual transaction filtering](https://actualbudget.org/docs/transactions/filters/) and [YNAB search, sorting and filtering](https://support.ynab.com/en_us/searching-transactions-a-guide-r1gxyQryj?mobile-help=true). These informed the local search workflow; no service integration was added.
+
+## Previously skipped photo-picker tests completed
+
+Both photo-picker end-to-end cases now passed on a fresh dedicated simulator with synthetic images. The initial image saved Example Cafe USD 12.34 and Louis Vuitton USD 55.00, both dated October 25. The overlapping image defaulted to selecting only New Grocery USD 9.25 dated October 26. Importing that same image again selected zero entries and disabled saving. Reading the simulator ledger confirmed exactly these three entries after the sequence.
+
+The automation was corrected to wait for the ready overview, select the actual nested confirmation switch, and scroll the final save action into view. No app functionality changed during this follow-up. The previously signed latest app was reinstalled and launched at the user's request; before/after device ledger contents matched exactly. The earlier skipped-test limitation is now resolved for these two fixtures; unfamiliar real screenshots still require review.

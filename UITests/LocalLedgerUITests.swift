@@ -249,23 +249,29 @@ extension LocalLedgerUITests {
 extension LocalLedgerUITests {
     @MainActor func testStatementPhotoReview() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["LOCAL_LEDGER_PHOTO_FIXTURE"] == "initial", "Requires a dedicated simulator seeded with the original synthetic statement photo and no prior copies of those transactions.")
-        let app = XCUIApplication(); app.launch(); app.buttons["记账"].tap()
+        let app = XCUIApplication(); app.launchArguments = ["-welcomeCompleted", "YES", "-appLanguage", "zh-Hans"]; app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 15)); app.buttons["记账"].tap()
         app.buttons["识别账单列表（多笔）"].tap()
         XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 5) || app.buttons["取消"].exists)
         let loaded = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.staticTexts["正在加载…"].firstMatch)
         XCTAssertEqual(XCTWaiter.wait(for: [loaded], timeout: 30), .completed)
-        let photo = app.images.matching(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "PXGGridLayout-Info", "Screenshot")).firstMatch
+        let photo = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
         XCTAssertTrue(photo.waitForExistence(timeout: 10)); photo.tap()
         XCTAssertTrue(app.navigationBars["账单批量核对"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["保存所选 2 笔"].exists)
         XCTAssertFalse(app.buttons["保存所选 2 笔"].isEnabled)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "多笔账单核对"; shot.lifetime = .keepAlways; add(shot)
         for _ in 0..<5 { if app.switches["已逐笔核对，所选均为美元支出"].isHittable { break }; app.swipeUp() }
-        app.switches["已逐笔核对，所选均为美元支出"].switches.firstMatch.tap()
+        let confirmation = app.switches["已逐笔核对，所选均为美元支出"]
+        if confirmation.switches.firstMatch.exists { confirmation.switches.firstMatch.tap() }
+        else { confirmation.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap() }
+        XCTAssertEqual(confirmation.value as? String, "1")
+        for _ in 0..<5 { if app.buttons["确认保存所选消费"].isHittable { break }; app.swipeUp() }
         app.buttons["确认保存所选消费"].tap()
         XCTAssertTrue(app.alerts["已保存所选消费"].waitForExistence(timeout: 5))
         app.alerts.buttons["完成"].tap()
-        app.terminate(); app.launch(); app.buttons["记账"].tap()
+        app.terminate(); app.launch(); XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 15)); app.buttons["记账"].tap()
+        for _ in 0..<5 { if app.staticTexts["Louis Vuitton"].exists { break }; app.swipeUp() }
         XCTAssertTrue(app.staticTexts["Louis Vuitton"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Example Cafe"].exists)
     }
@@ -277,7 +283,8 @@ extension LocalLedgerUITests {
     // after testStatementPhotoReview has saved the original two rows.
     @MainActor func testOverlappingStatementReview() throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["LOCAL_LEDGER_PHOTO_FIXTURE"] == "overlap", "Requires the original two synthetic transactions and the overlapping statement as the newest simulator photo.")
-        let app = XCUIApplication(); app.launch(); app.buttons["记账"].tap()
+        let app = XCUIApplication(); app.launchArguments = ["-welcomeCompleted", "YES", "-appLanguage", "zh-Hans"]; app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 15)); app.buttons["记账"].tap()
         app.buttons["识别账单列表（多笔）"].tap()
         let photo = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
         XCTAssertTrue(photo.waitForExistence(timeout: 20)); photo.tap()
@@ -286,7 +293,11 @@ extension LocalLedgerUITests {
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "疑似已记过")).firstMatch.exists)
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "重叠账单默认跳过旧消费"; shot.lifetime = .keepAlways; add(shot)
         for _ in 0..<8 { if app.switches["已逐笔核对，所选均为美元支出"].isHittable { break }; app.swipeUp() }
-        app.switches["已逐笔核对，所选均为美元支出"].switches.firstMatch.tap()
+        let confirmation = app.switches["已逐笔核对，所选均为美元支出"]
+        if confirmation.switches.firstMatch.exists { confirmation.switches.firstMatch.tap() }
+        else { confirmation.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap() }
+        XCTAssertEqual(confirmation.value as? String, "1")
+        for _ in 0..<5 { if app.buttons["确认保存所选消费"].isHittable { break }; app.swipeUp() }
         app.buttons["确认保存所选消费"].tap()
         XCTAssertTrue(app.alerts["已保存所选消费"].waitForExistence(timeout: 5)); app.alerts.buttons["完成"].tap()
         app.buttons["识别账单列表（多笔）"].tap()
