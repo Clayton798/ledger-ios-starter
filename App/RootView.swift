@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import PhotosUI
+import UIKit
 
 struct Draft: Identifiable {
     let id = UUID()
@@ -9,9 +10,13 @@ struct Draft: Identifiable {
     var text: String = ""
 }
 struct RootView: View {
+    @AppStorage("appLanguage") private var language = "zh-Hans"
     @EnvironmentObject private var store: LedgerStore
     @AppStorage("welcomeCompleted") private var welcomeCompleted = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    private let dayCheck = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+    @State private var clockTimeZone = TimeZone.current
     @State private var showWelcome = false
     @State private var appeared = false
     @State private var cycleDate = LedgerDate.cycleSelection(Date())
@@ -20,29 +25,47 @@ struct RootView: View {
             DashboardView(date: $cycleDate).tabItem { Label("周期", systemImage: "square.grid.2x2") }
             AnalysisView(date: $cycleDate).tabItem { Label("分析", systemImage: "chart.bar.xaxis") }
             EntriesView(date: $cycleDate).tabItem { Label("记账", systemImage: "list.bullet.rectangle") }
-            SettingsView().tabItem { Label("设置", systemImage: "gearshape") }
-        }.tint(LedgerStyle.accent)
+            SettingsView(date: $cycleDate).tabItem { Label("设置", systemImage: "gearshape") }
+        }.id(language).tint(LedgerStyle.accent)
             .opacity(appeared ? 1 : 0)
             .onAppear {
+                if !appeared { cycleDate = LedgerDate.cycleSelection(Date(), startDay: store.ledger.settings.startDay) }
                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { appeared = true }
                 if !welcomeCompleted && store.ready {
-                    if store.ledger.entries.isEmpty && store.ledger.settings.budgets.values.allSatisfy({ $0 == nil }) {
+                    if store.ledger.entries.isEmpty && store.ledger.settings.budgets.values.allSatisfy({ $0 == nil }) && store.ledger.settings.overrides.values.allSatisfy({ $0.values.allSatisfy({ $0 == nil }) }) {
                         showWelcome = true
                     } else { welcomeCompleted = true }
                 }
             }
+            .onChange(of: store.ledger.settings.startDay) { _, _ in
+                cycleDate = LedgerDate.cycleSelection(Date(), startDay: store.ledger.settings.startDay)
+            }
+            .onReceive(dayCheck) { _ in refreshClock() }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in refreshClock() }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { refreshClock() } }
             .sheet(isPresented: $showWelcome, onDismiss: { welcomeCompleted = true }) {
                 QuickStartView { welcomeCompleted = true }
             }
     }
+    private func refreshClock() {
+        let selected = String(LedgerDate.string(cycleDate, timeZone: clockTimeZone).prefix(7))
+        let oldDay = store.today
+        store.refreshToday()
+        let key = LedgerDate.refreshedCycle(selected: selected, previousDay: oldDay, currentDay: store.today, startDay: store.ledger.settings.startDay)
+        clockTimeZone = .current
+        if let refreshed = LedgerDate.formatter().date(from: LedgerDate.cycleStart(key, startDay: store.ledger.settings.startDay)) {
+            cycleDate = refreshed
+        }
+    }
 }
 
 struct MonthSelector: View {
+    @EnvironmentObject private var store: LedgerStore
     @Binding var date: Date
     var body: some View {
         HStack {
             Button { move(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("上一期")
-            Spacer(); Text(LedgerDate.cycleLabel(LedgerDate.month(date))).font(.caption).monospacedDigit(); Spacer()
+            Spacer(); Text(L10n.period(LedgerDate.month(date), startDay: store.ledger.settings.startDay)).font(.caption).monospacedDigit(); Spacer()
             Button { move(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("下一期")
         }.buttonStyle(.borderless)
     }
@@ -62,11 +85,11 @@ struct BudgetRow: View {
         let limit = store.ledger.settings.limit(category, month: month)
         let status = store.ledger.cycleStatus(category: category, cycle: month)
         VStack(alignment: .leading, spacing: 7) {
-            HStack { Text(Categories.title(category)).font(LedgerStyle.labelFont(17)); Spacer(); Text(Money.display(spent)).monospacedDigit() }
-            Text(Categories.detail(category)).font(.caption).foregroundStyle(.secondary)
+            HStack { Text(L10n.text(Categories.title(category))).font(LedgerStyle.labelFont(17)); Spacer(); Text(Money.display(spent)).monospacedDigit() }
+            Text(L10n.text(Categories.detail(category))).font(.caption).foregroundStyle(.secondary)
             if let limit {
                 ProgressView(value: min(Double(spent), Double(max(1, limit))), total: Double(max(1, limit))).tint(spent > limit ? .orange : LedgerStyle.accent)
-                Text("\(status) · \(spent > limit ? "超出" : "剩余") \(Money.display(abs(limit - spent))) / 预算 \(Money.display(limit))")
+                Text("\(L10n.text(status)) · \(L10n.text(spent > limit ? "超出" : "剩余")) \(Money.display(abs(limit - spent))) / 预算 \(Money.display(limit))")
                     .font(.caption).foregroundStyle(spent >= limit ? .orange : .secondary)
             } else { Text("未设预算").font(.caption).foregroundStyle(.secondary) }
         }.padding(.vertical, 5)
@@ -112,14 +135,14 @@ struct EntriesView: View {
                     }.padding(.vertical, 12)
                     Divider()
                     Toggle("显示已作废", isOn: $showVoided).font(.caption).tint(LedgerStyle.accent).padding(.vertical, 14)
-                    let rows = store.ledger.entries.filter { LedgerDate.inCycle($0.date, key: LedgerDate.month(date)) && (showVoided || $0.voidedAt == nil) && (search.isEmpty || ($0.merchant + " " + ($0.note ?? "") + " " + Categories.title($0.category)).localizedCaseInsensitiveContains(search)) }.sorted { $0.date == $1.date ? $0.createdAt > $1.createdAt : $0.date > $1.date }
-                    if rows.isEmpty { ContentUnavailableView(search.isEmpty ? "从第一笔开始" : "没有找到匹配记录", systemImage: search.isEmpty ? "square.and.pencil" : "magnifyingglass", description: Text(search.isEmpty ? "选择付款截图，或手动记录今天的消费。" : "试试其他商家、分类或备注关键词。")) }
+                    let rows = store.ledger.entries.filter { LedgerDate.inCycle($0.date, key: LedgerDate.month(date), startDay: store.ledger.settings.startDay) && (showVoided || $0.voidedAt == nil) && (search.isEmpty || ($0.merchant + " " + L10n.merchant($0.merchant) + " " + ($0.note ?? "") + " " + Categories.title($0.category) + " " + L10n.text(Categories.title($0.category))).localizedCaseInsensitiveContains(search)) }.sorted { $0.date == $1.date ? $0.createdAt > $1.createdAt : $0.date > $1.date }
+                    if rows.isEmpty { ContentUnavailableView(LocalizedStringKey(search.isEmpty ? "从第一笔开始" : "没有找到匹配记录"), systemImage: search.isEmpty ? "square.and.pencil" : "magnifyingglass", description: Text(L10n.text(search.isEmpty ? "选择付款截图，或手动记录今天的消费。" : "试试其他商家、分类或备注关键词。"))) }
                     ForEach(rows) { entry in
                         Button { draft = Draft(entry: entry) } label: {
                             HStack(alignment: .firstTextBaseline, spacing: 16) {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text(entry.merchant).font(LedgerStyle.labelFont(16)).foregroundStyle(.primary)
-                                    Text("\(entry.date) · \(Categories.title(entry.category))\(entry.voidedAt == nil ? "" : " · 已作废")").font(.caption).foregroundStyle(.secondary)
+                                    Text(L10n.merchant(entry.merchant)).font(LedgerStyle.labelFont(16)).foregroundStyle(.primary)
+                                    Text("\(entry.date) · \(L10n.text(Categories.title(entry.category)))\(entry.voidedAt == nil ? "" : L10n.text(" · 已作废"))").font(.caption).foregroundStyle(.secondary)
                                     if let note = entry.note, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
                                 }
                                 Spacer(minLength: 0)

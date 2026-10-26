@@ -3,13 +3,23 @@ import UniformTypeIdentifiers
 
 @MainActor final class LedgerStore: ObservableObject {
     @Published private(set) var ledger = Ledger()
+    @Published private(set) var today = LedgerDate.string(Date())
+    func refreshToday() { today = LedgerDate.string(Date()) }
     @Published var error: String?
     @Published private(set) var ready = false
     let disk: LedgerDisk
     init() {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("LocalLedger", isDirectory: true)
         disk = LedgerDisk(url: directory.appendingPathComponent("ledger.json"))
-        do { ledger = try disk.load(); ready = true } catch { self.error = "无法读取账本，已停止写入保护数据：\(error.localizedDescription)" }
+        do {
+            let original = try disk.load()
+            let migrated = try original.usingIndependentBudgets(on: LedgerDate.string(Date()))
+            if migrated != original {
+                try LedgerDisk(url: directory.appendingPathComponent("before-cycle-upgrade.json")).save(original)
+                try disk.save(migrated)
+            }
+            ledger = migrated; ready = true
+        } catch { self.error = "无法读取账本，已停止写入保护数据：\(error.localizedDescription)" }
     }
     func commit(_ next: Ledger) throws {
         guard ready else { throw LedgerError.unavailable }
@@ -28,7 +38,7 @@ import UniformTypeIdentifiers
     }
     func restore(_ imported: Ledger) throws {
         guard ready else { throw LedgerError.unavailable }
-        let merged = try ledger.merging(imported)
+        let merged = try ledger.merging(imported).usingIndependentBudgets(on: LedgerDate.string(Date()))
         // Durable rollback copy includes both old records and old budgets, before changing anything.
         let previous = disk.url.deletingLastPathComponent().appendingPathComponent("before-restore.json")
         try LedgerDisk(url: previous).save(ledger)

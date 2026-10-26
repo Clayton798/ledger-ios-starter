@@ -16,7 +16,7 @@ for path in source_paths:
     source_refs.append(f)
     build_refs.append(add('build:'+path, '{isa = PBXBuildFile; fileRef = '+f+'; }'))
 resource_refs, resource_builds = [], []
-for path, typ in [('App/Assets.xcassets', 'folder.assetcatalog'), ('App/PrivacyInfo.xcprivacy','text.xml'), ('App/Fonts/NotoSerifSC.ttf','file'), ('App/Fonts/OFL.txt','text')]:
+for path, typ in [('App/Localizable.xcstrings', 'text.json.xcstrings'), ('App/Assets.xcassets', 'folder.assetcatalog'), ('App/PrivacyInfo.xcprivacy','text.xml'), ('App/Fonts/NotoSerifSC.ttf','file'), ('App/Fonts/OFL.txt','text')]:
     f = add(path, '{isa = PBXFileReference; lastKnownFileType = '+typ+'; path = '+quote(path)+'; sourceTree = SOURCE_ROOT; }')
     resource_refs.append(f); resource_builds.append(add('build:'+path, '{isa = PBXBuildFile; fileRef = '+f+'; }'))
 product = add('product','{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LocalLedger.app; sourceTree = BUILT_PRODUCTS_DIR; }')
@@ -50,7 +50,7 @@ dependency=add('ui-dependency','{isa = PBXTargetDependency; target = '+target+';
 ui_target=add('ui-target','{isa = PBXNativeTarget; buildConfigurationList = '+ui_config+'; buildPhases = '+refs([ui_sources])+'; buildRules = (); dependencies = '+refs([dependency])+'; name = LocalLedgerUITests; productName = LocalLedgerUITests; productReference = '+ui_product+'; productType = "com.apple.product-type.bundle.ui-testing"; }')
 objects[group]=objects[group].replace(refs(source_refs+resource_refs+[products]),refs(source_refs+resource_refs+[ui_file,products]))
 objects[products]=objects[products].replace(refs([product]),refs([product,ui_product]))
-project=add('project','{isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1600; }; buildConfigurationList = '+project_config+'; compatibilityVersion = "Xcode 14.0"; developmentRegion = "zh-Hans"; hasScannedForEncodings = 0; knownRegions = ("zh-Hans", en, Base); mainGroup = '+group+'; productRefGroup = '+products+'; projectDirPath = ""; projectRoot = ""; targets = '+refs([target,ui_target])+'; }')
+project=add('project','{isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 1600; }; buildConfigurationList = '+project_config+'; compatibilityVersion = "Xcode 14.0"; developmentRegion = "zh-Hans"; hasScannedForEncodings = 0; knownRegions = ("zh-Hans", en, fr, Base); mainGroup = '+group+'; productRefGroup = '+products+'; projectDirPath = ""; projectRoot = ""; targets = '+refs([target,ui_target])+'; }')
 (root/'LocalLedger.xcodeproj/project.pbxproj').write_text('// !$*UTF8*$!\n{archiveVersion = 1; classes = {}; objectVersion = 56; objects = {\n'+ '\n'.join(k+' = '+v+';' for k,v in objects.items())+'\n}; rootObject = '+project+'; }\n')
 scheme=f'''<?xml version="1.0" encoding="UTF-8"?>
 <Scheme LastUpgradeVersion="1600" version="1.3">

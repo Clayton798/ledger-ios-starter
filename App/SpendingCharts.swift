@@ -22,11 +22,11 @@ struct SpendingRing: View {
         Chart(slices) { slice in
             SectorMark(angle: .value("美分", slice.cents), innerRadius: .ratio(0.88), angularInset: 2)
                 .foregroundStyle(LedgerStyle.category(slice.id))
-                .accessibilityLabel(Categories.title(slice.id)).accessibilityValue(Money.display(slice.cents))
+                .accessibilityLabel(L10n.text(Categories.title(slice.id))).accessibilityValue(Money.display(slice.cents))
         }.chartLegend(.hidden)
             .overlay {
                 VStack(spacing: 8) {
-                    Text(compact ? "消费分类" : "本期支出").font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.text(compact ? "消费分类" : "本期支出")).font(.caption).foregroundStyle(.secondary)
                     Text(compact ? String(format: "%02d", slices.count) : Money.decimal(total))
                         .font(LedgerStyle.amountFont(compact ? 34 : 32)).lineLimit(1).minimumScaleFactor(0.6)
                     if !compact { Text("USD").font(.caption2).tracking(2).foregroundStyle(.secondary) }
@@ -57,7 +57,7 @@ struct SpendingOverview: View {
                 HStack(spacing: 10) {
                     Rectangle().fill(LedgerStyle.category(slice.id)).frame(width: 3, height: 30)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(Categories.title(slice.id)).font(LedgerStyle.labelFont(16))
+                        Text(L10n.text(Categories.title(slice.id))).font(LedgerStyle.labelFont(16))
                         Text(String(format: "%.1f%%", Double(slice.cents) / Double(max(1, total)) * 100))
                             .font(LedgerStyle.amountFont(19)).foregroundStyle(.secondary)
                     }
@@ -68,6 +68,7 @@ struct SpendingOverview: View {
     }
 }
 struct SpendingCharts: View {
+    @EnvironmentObject private var store: LedgerStore
     let ledger: Ledger
     let cycle: String
     @AppStorage("spendingChartStyle") private var savedStyle = "环形"
@@ -79,12 +80,12 @@ struct SpendingCharts: View {
     private var total: Int { ledger.cycleSpent(cycle: cycle) }
     private var slices: [SpendingSlice] { spendingSlices(ledger, cycle: cycle) }
     private var days: [SpendingDay] {
-        let rows = ledger.entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle) }
+        let rows = ledger.entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle, startDay: ledger.settings.startDay) }
         let sums = Dictionary(grouping: rows, by: \.date).mapValues { $0.reduce(0) { $0 + $1.amount } }
-        let end = LedgerDate.cycleEndExclusive(cycle)
-        let today = LedgerDate.string(Date())
+        let end = LedgerDate.cycleEndExclusive(cycle, startDay: ledger.settings.startDay)
+        let today = store.today
         let cutoff = max(today, rows.map(\.date).max() ?? today)
-        guard var day = LedgerDate.formatter().date(from: cycle + "-22") else { return [] }
+        guard var day = LedgerDate.formatter().date(from: LedgerDate.cycleStart(cycle, startDay: ledger.settings.startDay)) else { return [] }
         var result: [SpendingDay] = []
         for _ in 0..<31 {
             let key = LedgerDate.string(day)
@@ -99,7 +100,7 @@ struct SpendingCharts: View {
             ForEach(styles, id: \.self) { value in
                 Button { style = value } label: {
                     VStack(spacing: 10) {
-                        Text(value).font(LedgerStyle.labelFont(16)).foregroundStyle(style == value ? .primary : .secondary)
+                        Text(LocalizedStringKey(value)).font(LedgerStyle.labelFont(16)).foregroundStyle(style == value ? .primary : .secondary)
                         Rectangle().fill(style == value ? LedgerStyle.accent : .clear).frame(height: 1)
                     }.padding(.vertical, 8)
                 }.buttonStyle(.plain).accessibilityAddTraits(style == value ? .isSelected : [])
@@ -128,7 +129,7 @@ struct SpendingCharts: View {
                     HStack(spacing: 12) {
                         Text(String(format: "%02d", index + 1)).font(LedgerStyle.amountFont(15)).foregroundStyle(.secondary)
                         Rectangle().fill(LedgerStyle.category(slice.id)).frame(width: 3, height: 28)
-                        Text(Categories.title(slice.id)).font(LedgerStyle.labelFont(16))
+                        Text(L10n.text(Categories.title(slice.id))).font(LedgerStyle.labelFont(16))
                         Spacer(minLength: 8)
                         VStack(alignment: .trailing, spacing: 5) {
                             Text(Money.decimal(slice.cents)).font(LedgerStyle.amountFont(24)).lineLimit(1).minimumScaleFactor(0.6)

@@ -29,7 +29,7 @@ struct EntryEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                if let reason = draft.receipt?.blockedReason { Section("无法保存此截图") { Text(reason).foregroundStyle(.orange) } }
+                if let reason = draft.receipt?.blockedReason { Section("无法保存此截图") { Text(L10n.text(reason)).foregroundStyle(.orange) } }
                 if draft.entry?.voidedAt != nil { Text("此记录已作废，保留供备份核对，不计入支出。").foregroundStyle(.secondary) }
                 if let receipt = draft.receipt {
                     Section("识别提示") {
@@ -40,11 +40,15 @@ struct EntryEditor: View {
                                 Button(Money.display(cents)) { amount = Money.decimal(cents) }
                             }
                         } else if receipt.amounts.isEmpty { Text("未识别到金额，请手动输入。").foregroundStyle(.orange) }
-                        if receipt.dates.count != 1 { Text("日期不明确，请手动填写 YYYY-MM-DD。").foregroundStyle(.orange) }
+                        if receipt.dates.count != 1 { Text("截图日期不明确，请填写实际消费日期。图片里的“今天／昨天”不能按导入当天计算。").foregroundStyle(.orange) }
                         DisclosureGroup("查看识别文字（仅本次显示）") { Text(draft.text).font(.caption).textSelection(.enabled) }
                     }
                 }
                 Section("消费信息") {
+                    if !merchant.isEmpty {
+                        Text("已支出 \(amount) USD · \(L10n.merchant(merchant))").font(.subheadline)
+                        if L10n.merchant(merchant) != merchant { Text("原商家名：\(merchant)").font(.caption).foregroundStyle(.secondary) }
+                    }
                     TextField("金额（USD，例如 12.50）", text: $amount).keyboardType(.decimalPad)
                     TextField("商家", text: $merchant)
                         .onChange(of: merchant) { _, value in
@@ -52,11 +56,11 @@ struct EntryEditor: View {
                         }
                     TextField("日期 YYYY-MM-DD", text: $date).keyboardType(.numbersAndPunctuation)
                     TextField("备注（可选）", text: $note)
-                    Picker("分类", selection: Binding(get: { category }, set: { category = $0; categoryWasChosen = true })) { ForEach(store.ledger.visibleCategories(selected: category), id: \.self) { Text(Categories.title($0)).tag($0) } }.accessibilityIdentifier("entry.category").accessibilityValue(Categories.title(category))
+                    Picker("分类", selection: Binding(get: { category }, set: { category = $0; categoryWasChosen = true })) { ForEach(store.ledger.visibleCategories(selected: category), id: \.self) { Text(L10n.text(Categories.title($0))).tag($0) } }.accessibilityIdentifier("entry.category").accessibilityValue(L10n.text(Categories.title(category)))
                     Button("按商家建议分类") { categoryWasChosen = false; category = store.ledger.suggestedCategory(for: merchant) }
                     Text(store.ledger.rememberedCategory(for: merchant) == nil ? "保存后会记住此商家的分类，下次自动填好。" : "已参考你上次保存的同名商家分类，仍可修改。")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(Categories.guidance).font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.text(Categories.guidance)).font(.caption).foregroundStyle(.secondary)
                 }.disabled(blocked)
                 if !blocked {
                     Section {
@@ -80,7 +84,7 @@ struct EntryEditor: View {
                         }
                     }
                 }
-                .alert("未保存", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(error ?? "") }
+                .alert("未保存", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(L10n.text(error ?? "")) }
                 .alert("疑似重复消费", isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })) {
                     Button("取消", role: .cancel) { pending = nil }
                     Button("确认是另一笔，保存") { if let entry = pending { save(entry) }; pending = nil }
@@ -91,12 +95,12 @@ struct EntryEditor: View {
                 } message: { Text("原记录仍保留在备份中，但不再计入支出。作废不能代替部分退款记账。") }
                 .alert("已保存", isPresented: Binding(get: { savedMessage != nil }, set: { if !$0 { savedMessage = nil; dismiss() } })) {
                     Button("完成") { dismiss() }
-                } message: { Text(savedMessage ?? "") }
+                } message: { Text(L10n.text(savedMessage ?? "")) }
         }
     }
     func prepareSave() {
         guard currencyConfirmed, !blocked else { error = "请确认美元币种；退款或其他币种不能保存。"; return }
-        guard let cents = Money.cents(amount), cents > 0 else { error = "请输入大于 0 的美元金额，最多两位小数。"; return }
+        guard let cents = L10n.cents(amount), cents > 0 else { error = "请输入大于 0 的美元金额，最多两位小数。"; return }
         var entry = draft.entry ?? Entry(amount: cents, merchant: merchant, date: date, category: category, fingerprint: draft.receipt?.fingerprint ?? "", orderHash: draft.receipt?.orderHash ?? "")
         entry.note = note.isEmpty ? nil : note
         entry.amount = cents; entry.merchant = merchant.trimmingCharacters(in: .whitespacesAndNewlines); entry.date = date.trimmingCharacters(in: .whitespacesAndNewlines); entry.category = category
@@ -110,11 +114,11 @@ struct EntryEditor: View {
     func save(_ entry: Entry) {
         do {
             try store.save(entry)
-            let month = LedgerDate.cycleKey(for: entry.date), used = store.ledger.cycleSpent(category: entry.category, cycle: month)
-            var message = "\(LedgerDate.cycleLabel(month)) · \(Categories.title(entry.category))已花 \(Money.display(used))。"
+            let month = LedgerDate.cycleKey(for: entry.date, startDay: store.ledger.settings.startDay), used = store.ledger.cycleSpent(category: entry.category, cycle: month)
+            var message = L10n.format("%@ · %@ · 已花 %@", L10n.period(month, startDay: store.ledger.settings.startDay), L10n.text(Categories.title(entry.category)), Money.display(used))
             if let limit = store.ledger.settings.limit(entry.category, month: month) {
-                message += "\(store.ledger.cycleStatus(category: entry.category, cycle: month))，\(used > limit ? "超出" : "剩余") \(Money.display(abs(limit - used)))。"
-            } else { message += "尚未设置此分类预算。" }
+                message += "\n" + L10n.format("%@ · %@ %@", L10n.text(store.ledger.cycleStatus(category: entry.category, cycle: month)), L10n.text(used > limit ? "超出" : "剩余"), Money.display(abs(limit - used)))
+            } else { message += "\n" + L10n.text("尚未设置此分类预算。") }
             savedMessage = message
         } catch { self.error = error.localizedDescription }
     }

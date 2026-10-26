@@ -22,6 +22,14 @@ public enum Money {
         let fraction = parts.count == 2 ? String(parts[1]) : ""
         return whole * 100 + (Int(fraction.padding(toLength: 2, withPad: "0", startingAt: 0)) ?? 0)
     }
+    public static func inputCents(_ input: String, decimalComma: Bool) -> Int? {
+        let value = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if decimalComma && value.contains(",") {
+            guard value.range(of: #"^[0-9]{1,9},[0-9]{1,2}$"#, options: .regularExpression) != nil else { return nil }
+            return cents(value.replacingOccurrences(of: ",", with: "."))
+        }
+        return cents(value)
+    }
     public static func decimal(_ cents: Int) -> String {
         let n = abs(cents)
         return "\(cents < 0 ? "-" : "")\(n / 100).\(String(format: "%02d", n % 100))"
@@ -40,7 +48,13 @@ public enum LedgerDate {
         f.calendar = Calendar(identifier: .gregorian); f.dateFormat = "yyyy-MM-dd"
         return f
     }
-    public static func string(_ date: Date) -> String { formatter().string(from: date) }
+    public static func string(_ date: Date, timeZone: TimeZone = .current) -> String {
+        let f = formatter(); f.timeZone = timeZone; return f.string(from: date)
+    }
+    public static func refreshedCycle(selected: String, previousDay: String, currentDay: String, startDay: Int) -> String {
+        selected == cycleKey(for: previousDay, startDay: startDay)
+            ? cycleKey(for: currentDay, startDay: startDay) : selected
+    }
     public static func month(_ date: Date) -> String { String(string(date).prefix(7)) }
     public static func validMonth(_ value: String) -> Bool { valid(value + "-01") }
 }
@@ -96,16 +110,19 @@ public struct Entry: Codable, Equatable, Identifiable, Sendable {
 public struct BudgetSettings: Codable, Equatable, Sendable {
     public var version = 2
     public var currency = "USD"
+    public var cycleStartDay: Int? = nil
+    public var cycleBudgetsOnly: Bool? = nil
+    public var startDay: Int { cycleStartDay ?? 22 }
     public var budgets: [String: Int?] = [:]
     public var overrides: [String: [String: Int?]] = [:]
     public init() {}
     public func limit(_ category: String, month: String) -> Int? {
         if let monthly = overrides[month], monthly.keys.contains(category) { return monthly[category] ?? nil }
-        return budgets[category] ?? nil
+        return cycleBudgetsOnly == true ? nil : (budgets[category] ?? nil)
     }
     public func validate() throws {
         let sets = [budgets] + Array(overrides.values)
-        guard version == 2, currency == "USD", overrides.keys.allSatisfy(LedgerDate.validMonth), sets.allSatisfy({ dict in dict.allSatisfy { Categories.all.contains($0.key) && ($0.value == nil || (0...Money.maximum).contains($0.value!)) } }) else { throw LedgerError.invalid("预算必须是 USD v2，有效月份和非负整数美分。") }
+        guard version == 2, currency == "USD", (1...31).contains(startDay), overrides.keys.allSatisfy(LedgerDate.validMonth), sets.allSatisfy({ dict in dict.allSatisfy { Categories.all.contains($0.key) && ($0.value == nil || (0...Money.maximum).contains($0.value!)) } }) else { throw LedgerError.invalid("预算必须是 USD v2，有效月份和非负整数美分。") }
     }
 }
 
@@ -123,9 +140,9 @@ public struct Ledger: Codable, Equatable, Sendable {
     /// Most recently saved/edited non-void transaction for the exact normalized merchant.
     /// Derived from the ledger, so backup/restore preserves memory without a new schema.
     public func rememberedCategory(for merchant: String) -> String? {
-        let key = Categories.merchantKey(merchant)
+        let key = Categories.merchantKey(MerchantDisplay.name(merchant))
         guard !key.isEmpty else { return nil }
-        return entries.enumerated().filter { $0.element.voidedAt == nil && Categories.merchantKey($0.element.merchant) == key }
+        return entries.enumerated().filter { $0.element.voidedAt == nil && Categories.merchantKey(MerchantDisplay.name($0.element.merchant)) == key }
             .max { lhs, rhs in
                 let l = lhs.element.updatedAt ?? lhs.element.createdAt
                 let r = rhs.element.updatedAt ?? rhs.element.createdAt
@@ -155,7 +172,7 @@ public struct Ledger: Codable, Equatable, Sendable {
         entries.contains { $0.id != entry.id && $0.voidedAt == nil && ((!entry.fingerprint.isEmpty && $0.fingerprint == entry.fingerprint) || (!entry.orderHash.isEmpty && $0.orderHash == entry.orderHash)) }
     }
     public func possibleDuplicate(of entry: Entry) -> Bool {
-        entries.contains { $0.id != entry.id && $0.voidedAt == nil && $0.amount == entry.amount && $0.date == entry.date && Categories.merchantKey($0.merchant) == Categories.merchantKey(entry.merchant) }
+        entries.contains { $0.id != entry.id && $0.voidedAt == nil && $0.amount == entry.amount && $0.date == entry.date && Categories.merchantKey(MerchantDisplay.name($0.merchant)) == Categories.merchantKey(MerchantDisplay.name(entry.merchant)) }
     }
     public mutating func upsert(_ entry: Entry) throws {
         try entry.validate()
@@ -182,29 +199,55 @@ public struct Ledger: Codable, Equatable, Sendable {
 
 
 extension LedgerDate {
-    public static func cycleKey(for day: String) -> String {
-        guard valid(day), let date = formatter().date(from: day) else { return "" }
-        if Int(day.suffix(2))! >= 22 { return String(day.prefix(7)) }
-        let previous = Calendar(identifier: .gregorian).date(byAdding: .month, value: -1, to: date)!
-        return month(previous)
+    public static func cycleStart(_ key: String, startDay: Int = 22) -> String {
+        guard validMonth(key), (1...31).contains(startDay), let first = formatter().date(from: key + "-01"),
+              let days = Calendar(identifier: .gregorian).range(of: .day, in: .month, for: first) else { return "" }
+        return key + String(format: "-%02d", min(startDay, days.count))
     }
-    public static func cycleSelection(_ date: Date) -> Date { formatter().date(from: cycleKey(for: string(date)) + "-22") ?? date }
-    public static func cycleEndExclusive(_ key: String) -> String {
-        guard let start = formatter().date(from: key + "-22"), validMonth(key) else { return "" }
-        return string(Calendar(identifier: .gregorian).date(byAdding: .month, value: 1, to: start)!)
+    public static func cycleKey(for day: String, startDay: Int = 22) -> String {
+        guard valid(day), (1...31).contains(startDay) else { return "" }
+        let key = String(day.prefix(7))
+        if day >= cycleStart(key, startDay: startDay) { return key }
+        let first = formatter().date(from: key + "-01")!
+        return month(Calendar(identifier: .gregorian).date(byAdding: .month, value: -1, to: first)!)
     }
-    public static func inCycle(_ day: String, key: String) -> Bool {
-        valid(day) && validMonth(key) && day >= key + "-22" && day < cycleEndExclusive(key)
+    public static func cycleSelection(_ date: Date, startDay: Int = 22) -> Date {
+        formatter().date(from: cycleStart(cycleKey(for: string(date), startDay: startDay), startDay: startDay)) ?? date
     }
-    public static func cycleLabel(_ key: String) -> String {
-        let end = cycleEndExclusive(key)
-        guard !end.isEmpty else { return key }
-        return key + "-22 至 " + String(end.prefix(7)) + "-21"
+    public static func cycleEndExclusive(_ key: String, startDay: Int = 22) -> String {
+        guard validMonth(key), (1...31).contains(startDay), let first = formatter().date(from: key + "-01") else { return "" }
+        let next = Calendar(identifier: .gregorian).date(byAdding: .month, value: 1, to: first)!
+        return cycleStart(month(next), startDay: startDay)
+    }
+    public static func inCycle(_ day: String, key: String, startDay: Int = 22) -> Bool {
+        valid(day) && validMonth(key) && (1...31).contains(startDay) && day >= cycleStart(key, startDay: startDay) && day < cycleEndExclusive(key, startDay: startDay)
+    }
+    public static func cycleLabel(_ key: String, startDay: Int = 22) -> String {
+        guard let end = formatter().date(from: cycleEndExclusive(key, startDay: startDay)) else { return key }
+        let last = Calendar(identifier: .gregorian).date(byAdding: .day, value: -1, to: end)!
+        return cycleStart(key, startDay: startDay) + " 至 " + string(last)
+    }
+}
+extension Ledger {
+    // Pin legacy recurring limits to the current cycle once, preserving explicit overrides.
+    public func usingIndependentBudgets(on day: String) throws -> Ledger {
+        try validate()
+        guard LedgerDate.valid(day) else { throw LedgerError.invalid("迁移日期无效。") }
+        guard settings.cycleBudgetsOnly != true else { return self }
+        var next = self
+        let key = LedgerDate.cycleKey(for: day, startDay: settings.startDay)
+        var current = settings.overrides[key] ?? [:]
+        for (category, value) in settings.budgets where !current.keys.contains(category) { current[category] = .some(value) }
+        if !current.isEmpty { next.settings.overrides[key] = current }
+        next.settings.budgets = [:]
+        next.settings.cycleBudgetsOnly = true
+        try next.validate()
+        return next
     }
 }
 extension Ledger {
     public func cycleSpent(category: String? = nil, cycle: String) -> Int {
-        entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle) && (category == nil || $0.category == category) }.reduce(0) { $0 + $1.amount }
+        entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle, startDay: settings.startDay) && (category == nil || $0.category == category) }.reduce(0) { $0 + $1.amount }
     }
     public func cycleStatus(category: String, cycle: String) -> String {
         guard let limit = settings.limit(category, month: cycle) else { return "未设预算" }
@@ -212,5 +255,17 @@ extension Ledger {
         if used > limit { return "已超预算" }
         if used == limit { return "已用完" }
         return used * 5 >= limit * 4 ? "接近预算" : "预算内"
+    }
+}
+
+
+public enum MerchantDisplay {
+    public static func name(_ original: String) -> String {
+        let key = Categories.merchantKey(original)
+        switch key {
+        case "路易威登", "路易·威登", "louisvuitton", "lv": return "Louis Vuitton"
+        case "hashimarket": return "Hashi Market"
+        default: return original
+        }
     }
 }

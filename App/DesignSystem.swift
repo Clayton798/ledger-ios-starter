@@ -110,7 +110,7 @@ struct QuickStartView: View {
                         step("3", "看看花在哪，再做备份", "在“周期”查看花费，在“设置”保存账本副本，换机时再找回。")
                     }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-                    Label("当前按每月 22 日至下月 21 日统计，仅支持美元正向支出。", systemImage: "calendar")
+                    Label("周期起始日可在设置中修改。预算每期单独填写，仅支持美元正向支出。", systemImage: "calendar")
                         .font(.footnote).foregroundStyle(.secondary)
                     NavigationLink { BudgetEditor() } label: {
                         Label("先设置我的预算", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
@@ -128,8 +128,8 @@ struct QuickStartView: View {
             Text(number).font(.system(.headline, design: .rounded)).foregroundStyle(LedgerStyle.accent)
                 .frame(width: 30, height: 30).background(LedgerStyle.accent.opacity(0.10), in: Circle())
             VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                Text(LocalizedStringKey(title)).font(.headline)
+                Text(LocalizedStringKey(detail)).font(.subheadline).foregroundStyle(.secondary)
             }
         }
     }
@@ -144,8 +144,8 @@ struct EditorialAction: View {
             Image(systemName: symbol).font(.system(size: 19, weight: .ultraLight))
                 .foregroundStyle(LedgerStyle.accent).frame(width: 24)
             VStack(alignment: .leading, spacing: 7) {
-                Text(title).font(LedgerStyle.labelFont(17)).foregroundStyle(.primary)
-                Text(detail).font(.caption).foregroundStyle(.secondary).lineSpacing(3)
+                Text(LocalizedStringKey(title)).font(LedgerStyle.labelFont(17)).foregroundStyle(.primary)
+                Text(LocalizedStringKey(detail)).font(.caption).foregroundStyle(.secondary).lineSpacing(3)
             }
             Spacer(minLength: 8)
             Image(systemName: "arrow.up.right").font(.system(size: 12, weight: .light)).foregroundStyle(.secondary)

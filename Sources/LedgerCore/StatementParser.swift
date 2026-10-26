@@ -49,6 +49,9 @@ public enum StatementParser {
             let line = raw.precomposedStringWithCompatibilityMapping
             let parsed = ReceiptParser.parse(line)
             let hits = ReceiptParser.matches(moneyPattern, line)
+            // Relative dates belong to the capture day, never the import day.
+            // Clear inherited headings even when the relative label shares a money row.
+            if parsed.dates.count > 1 || ReceiptParser.has(#"今天|昨天|前天|明天|今日|昨日|\b(?:today|yesterday|tomorrow)\b"#, line) { contextDate = "" }
             guard !hits.isEmpty else {
                 if parsed.dates.count == 1 { contextDate = parsed.dates[0] }
                 else if ReceiptParser.has(#"[0-9]{1,2}[月/-][0-9]{1,2}|今天|昨天|today|yesterday"#, line) { contextDate = "" }
@@ -68,6 +71,7 @@ public enum StatementParser {
             merchant = merchant.replacingOccurrences(of: #"20[0-9]{2}[年/.-][0-9]{1,2}[月/.-][0-9]{1,2}日?|\b[0-9]{1,2}:[0-9]{2}(?::[0-9]{2})?\b"#, with: "", options: .regularExpression)
             merchant = merchant.replacingOccurrences(of: #"^(?:商家|商户|merchant|消费|支出|金额|amount)[:：\s]*"#, with: "", options: [.regularExpression, .caseInsensitive]).trimmingCharacters(in: .whitespacesAndNewlines)
             if merchant.isEmpty && ReceiptParser.parse(previous).dates.isEmpty && !ReceiptParser.has(#"USD|美元|账单|明细|statement|transactions"#, previous) { merchant = previous }
+            if !parsed.merchant.isEmpty { merchant = parsed.merchant }
             // Full-image + visual-row identity keeps equal-amount rows separate and
             // rejects importing the same image row again, including partial imports.
             let fingerprint = "statement-" + ReceiptParser.fingerprint(text) + "-" + String(index)

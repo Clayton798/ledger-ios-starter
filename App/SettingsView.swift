@@ -1,7 +1,10 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct SettingsView: View {
+    @AppStorage("appLanguage") private var language = "zh-Hans"
+    @Binding var date: Date
     @EnvironmentObject private var store: LedgerStore
     @State private var importing = false
     @State private var showGuide = false
@@ -14,10 +17,22 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     LedgerHeading(title: "设置", subtitle: "PERSONAL PREFERENCES")
+                    HStack {
+                        Text("界面语言").font(LedgerStyle.labelFont(17))
+                        Spacer()
+                        Picker("界面语言", selection: $language) {
+                            ForEach(AppLanguage.allCases) { option in Text(verbatim: option.title).tag(option.rawValue) }
+                        }.labelsHidden().pickerStyle(.menu).accessibilityIdentifier("settings.language")
+                    }.padding(.vertical, 16)
+                    Text("仅改变显示语言，账目、金额与日期不变。").font(.caption).foregroundStyle(.secondary).padding(.bottom, 20)
                     Divider()
                     EditorialSectionTitle(title: "我的预算", index: "01").padding(.top, 28)
-                    NavigationLink { BudgetEditor() } label: {
-                        EditorialAction(title: "调整每类能花多少钱", detail: "每月 22 日开始新一期，按自己的节奏安排", symbol: "slider.horizontal.3")
+                    NavigationLink { BudgetEditor(initialDate: date) } label: {
+                        EditorialAction(title: "调整每类能花多少钱", detail: "每期独立设置，不自动沿用到下个月", symbol: "slider.horizontal.3")
+                    }.disabled(!store.ready)
+                    Divider()
+                    NavigationLink { CycleEditor() } label: {
+                        EditorialAction(title: "每期从哪天开始", detail: L10n.format("当前为每月 %lld 日，可改为自然月", store.ledger.settings.startDay), symbol: "calendar")
                     }.disabled(!store.ready)
                     Divider()
                     EditorialSectionTitle(title: "保存与找回", index: "02").padding(.top, 30)
@@ -26,7 +41,7 @@ struct SettingsView: View {
                     }.disabled(!store.ready)
                     Divider()
                     Button { importing = true } label: {
-                        EditorialAction(title: "从文件找回账本", detail: "保留现有消费，使用副本中的预算", symbol: "arrow.down.document")
+                        EditorialAction(title: "从文件找回账本", detail: "保留现有消费，使用副本中的预算与周期", symbol: "arrow.down.document")
                     }.disabled(!store.ready)
                     Divider()
                     DisclosureGroup("更多找回选项") {
@@ -56,7 +71,7 @@ struct SettingsView: View {
                     HStack { LedgerMark(); Spacer(); Text("账本 · 1.9").font(LedgerStyle.englishFont(12)).foregroundStyle(.secondary) }.padding(.top, 24)
                 }.buttonStyle(.plain).padding(.horizontal, 28).padding(.bottom, 30)
                     .frame(maxWidth: 560).frame(maxWidth: .infinity)
-            }.background(LedgerStyle.canvas).toolbar(.hidden, for: .navigationBar)
+            }.background(LedgerStyle.canvas)
                 .sheet(isPresented: $showGuide) { QuickStartView() }
                 .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
                     do {
@@ -82,9 +97,9 @@ struct SettingsView: View {
                         incoming = nil
                     }
                 } message: {
-                    Text("备份包含 \(incoming?.entries.count ?? 0) 条记录（含作废）。已存在的相同记录不会重复添加。你的现有消费会保留，预算会改用文件里的设置。开始前会自动留存一份当前账本。")
+                    Text("备份包含 \(incoming?.entries.count ?? 0) 条记录（含作废）。已存在的相同记录不会重复添加。你的现有消费会保留，预算和周期起始日会改用文件里的设置。旧版通用预算只会用于恢复时的本期。开始前会自动留存一份当前账本。")
                 }
-                .alert("提示", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(notice ?? "") }
+                .alert("提示", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(L10n.text(notice ?? "")) }
         }
     }
     func exportCurrent() {
@@ -101,14 +116,15 @@ struct SettingsView: View {
 struct BudgetEditor: View {
     @EnvironmentObject private var store: LedgerStore
     @Environment(\.dismiss) private var dismiss
-    @State private var monthly = false
+    var initialDate: Date? = nil
+    private let monthly = true
     @State private var date = LedgerDate.cycleSelection(Date())
     @State private var amounts: [String: String] = [:]
     @State private var notice: String?
     var body: some View {
         Form {
             Section {
-                Toggle("仅设置指定周期", isOn: $monthly).onChange(of: monthly) { _, _ in load() }
+                Text("每期预算独立保存，未填写的周期不会自动沿用。")
                 if monthly { MonthSelector(date: $date).onChange(of: date) { _, _ in load() } }
                 Text("金额单位 USD。留空表示该分类不设预算，0 表示不计划支出。切换周期会重新载入已保存值，请先保存修改。").font(.caption).foregroundStyle(.secondary)
             }
@@ -116,8 +132,8 @@ struct BudgetEditor: View {
                 ForEach(store.ledger.visibleCategories(), id: \.self) { category in
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(Categories.title(category))
-                            Text(Categories.detail(category)).font(.caption).foregroundStyle(.secondary)
+                            Text(L10n.text(Categories.title(category)))
+                            Text(L10n.text(Categories.detail(category))).font(.caption).foregroundStyle(.secondary)
                         }
                         TextField("不设预算", text: Binding(get: { amounts[category] ?? "" }, set: { amounts[category] = $0 })).keyboardType(.decimalPad).multilineTextAlignment(.trailing).accessibilityIdentifier("budget." + category)
                     }
@@ -126,17 +142,21 @@ struct BudgetEditor: View {
             Section {
                 Text("先填你确定的固定支出，再给吃饭和购物留额度。洗衣可按每周次数估算；订阅按实际账单填写，未确定的先留空。").font(.caption).foregroundStyle(.secondary)
                 if monthly {
-                    Button("清除本期设置，沿用默认预算", role: .destructive) {
+                    Button("清除本期预算", role: .destructive) {
                         var next = store.ledger; next.settings.overrides.removeValue(forKey: LedgerDate.month(date))
-                        do { try store.commit(next); load(); notice = "本期已恢复沿用默认预算。" } catch { notice = error.localizedDescription }
+                        do { try store.commit(next); load(); notice = "本期已改为未设预算。" } catch { notice = error.localizedDescription }
                     }
                 }
             }
-            Text(Categories.guidance).font(.footnote).foregroundStyle(.secondary)
+            Text(L10n.text(Categories.guidance)).font(.footnote).foregroundStyle(.secondary)
         }.ledgerCanvas().scrollDismissesKeyboard(.interactively)
+            .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidBeginEditingNotification)) { notification in
+                guard let field = notification.object as? UITextField else { return }
+                DispatchQueue.main.async { field.selectAll(nil) }
+            }
             .safeAreaInset(edge: .bottom) { Button("保存预算") { save() }.buttonStyle(.borderedProminent).padding().frame(maxWidth: .infinity).background(.regularMaterial) }
-            .navigationTitle("分类预算").onAppear { load() }
-            .alert("预算", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(notice ?? "") }
+            .safeAreaInset(edge: .top) { Button("返回设置") { dismiss() }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("本期分类预算").onAppear { date = initialDate ?? LedgerDate.cycleSelection(Date(), startDay: store.ledger.settings.startDay); load() }
+            .alert("预算", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) { Button("知道了", role: .cancel) {} } message: { Text(L10n.text(notice ?? "")) }
     }
     func load() {
         for category in Categories.all {
@@ -150,11 +170,46 @@ struct BudgetEditor: View {
             for category in Categories.all {
                 let raw = (amounts[category] ?? "").trimmingCharacters(in: .whitespaces)
                 if raw.isEmpty { values[category] = .some(nil) }
-                else { guard let cents = Money.cents(raw) else { throw LedgerError.invalid("\(category)：请输入有效金额，最多两位小数。") }; values[category] = .some(cents) }
+                else { guard let cents = L10n.cents(raw) else { throw LedgerError.invalid(L10n.format("%@：请输入有效金额，最多两位小数。", L10n.text(Categories.title(category)))) }; values[category] = .some(cents) }
             }
             var next = store.ledger
             if monthly { next.settings.overrides[LedgerDate.month(date)] = values } else { next.settings.budgets = values }
             try store.commit(next); notice = "预算已保存。"
         } catch { notice = error.localizedDescription }
+    }
+}
+
+struct CycleEditor: View {
+    @EnvironmentObject private var store: LedgerStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var day = 22
+    @State private var confirm = false
+    @State private var notice: String?
+    var body: some View {
+        Form {
+            Section("每月从哪一天开始") {
+                Picker("起始日", selection: $day) {
+                    ForEach(1...31, id: \.self) { value in Text("每月 \(value) 日").tag(value) }
+                }.pickerStyle(.wheel).accessibilityIdentifier("cycle.startDay")
+                Text(day == 1 ? "按自然月统计，例如 9 月 1 日至 9 月 30 日。" : "从所选日期统计到下次开始的前一天。短月份没有这一天时，使用该月最后一天。")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section("修改后会怎样") {
+                Text("所有历史消费会按新的周期重新统计，消费本身的日期与金额不变。每期预算按起始月份保留，金额不会自动增减；修改后请核对各期预算。")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Button("保存周期设置") { confirm = true }.disabled(day == store.ledger.settings.startDay)
+        }.ledgerCanvas().safeAreaInset(edge: .top) { Button("返回设置") { dismiss() }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("记账周期")
+            .onAppear { day = store.ledger.settings.startDay }
+            .alert("改为每月 \(day) 日开始？", isPresented: $confirm) {
+                Button("取消", role: .cancel) {}
+                Button("确认修改") {
+                    var next = store.ledger; next.settings.cycleStartDay = day
+                    do { try store.commit(next); dismiss() } catch { notice = error.localizedDescription }
+                }
+            } message: { Text("历史记录会重新分期，预算按起始月份保留。不会修改或删除消费记录。") }
+            .alert("未保存", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
+                Button("知道了", role: .cancel) {}
+            } message: { Text(L10n.text(notice ?? "")) }
     }
 }

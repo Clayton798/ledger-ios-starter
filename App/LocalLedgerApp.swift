@@ -1,6 +1,7 @@
 import SwiftUI
 
 @main struct LocalLedgerApp: App {
+    @AppStorage("appLanguage") private var language = "zh-Hans"
     @StateObject private var store = LedgerStore()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -33,7 +34,8 @@ import SwiftUI
                 }
                 .alert("提示", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
                     Button("知道了", role: .cancel) { store.error = nil }
-                } message: { Text(store.error ?? "") }
+                } message: { Text(L10n.text(store.error ?? "")) }
+                .environment(\.locale, Locale(identifier: language))
         }
     }
 }

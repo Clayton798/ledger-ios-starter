@@ -7,8 +7,8 @@ struct LedgerHeading: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 9) {
-                Text(title).font(LedgerStyle.headingFont(23)).tracking(2)
-                Text(subtitle).font(LedgerStyle.englishFont(10)).tracking(2).foregroundStyle(.secondary)
+                Text(LocalizedStringKey(title)).font(LedgerStyle.headingFont(23)).tracking(2)
+                Text(LocalizedStringKey(subtitle)).font(LedgerStyle.englishFont(10)).tracking(2).foregroundStyle(.secondary)
             }
             Spacer()
             if let add {
@@ -23,7 +23,7 @@ struct EditorialSectionTitle: View {
     let index: String
     var body: some View {
         HStack {
-            Text(title).font(LedgerStyle.labelFont(17)).tracking(1)
+            Text(LocalizedStringKey(title)).font(LedgerStyle.labelFont(17)).tracking(1)
             Spacer()
             Text(index).font(LedgerStyle.amountFont(15)).foregroundStyle(LedgerStyle.accent)
         }
@@ -40,7 +40,7 @@ struct DashboardView: View {
     var completeBudget: Bool { !limits.isEmpty && limits.count == categories.count }
     var budget: Int { limits.reduce(0, +) }
     var recent: [Entry] {
-        Array(store.ledger.entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle) }
+        Array(store.ledger.entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle, startDay: store.ledger.settings.startDay) }
             .sorted { $0.date == $1.date ? $0.createdAt > $1.createdAt : $0.date > $1.date }.prefix(3))
     }
     var body: some View {
@@ -67,8 +67,8 @@ struct DashboardView: View {
                         Button { draft = Draft(entry: entry) } label: {
                             HStack(alignment: .firstTextBaseline) {
                                 VStack(alignment: .leading, spacing: 7) {
-                                    Text(entry.merchant).font(LedgerStyle.labelFont(16)).lineLimit(2)
-                                    Text("\(entry.date) · \(Categories.title(entry.category))").font(.caption).foregroundStyle(.secondary)
+                                    Text(L10n.merchant(entry.merchant)).font(LedgerStyle.labelFont(16)).lineLimit(2)
+                                    Text("\(entry.date) · \(L10n.text(Categories.title(entry.category)))").font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength: 12)
                                 Text(Money.decimal(entry.amount)).font(LedgerStyle.amountFont(23)).lineLimit(1).minimumScaleFactor(0.7)
@@ -96,17 +96,17 @@ struct DashboardView: View {
             }.padding(.top, 10)
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(completeBudget ? "本期预算" : "已设分类预算").font(.caption).foregroundStyle(.secondary)
-                    Text(limits.isEmpty ? "未设置" : Money.decimal(budget)).font(LedgerStyle.amountFont(23))
+                    Text(L10n.text(completeBudget ? "本期预算" : "已设分类预算")).font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.text(limits.isEmpty ? "未设置" : Money.decimal(budget))).font(LedgerStyle.amountFont(23))
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 8) {
-                    Text(completeBudget ? (spent > budget ? "已超出" : "还可花") : "预算设置").font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.text(completeBudget ? (spent > budget ? "已超出" : "还可花") : "预算设置")).font(.caption).foregroundStyle(.secondary)
                     if completeBudget {
                         Text(Money.decimal(abs(budget - spent))).font(LedgerStyle.amountFont(23)).foregroundStyle(spent > budget ? .orange : .primary)
                             .accessibilityIdentifier("overview.remaining")
                     } else {
-                        NavigationLink("完善预算") { BudgetEditor() }.font(.subheadline)
+                        NavigationLink("完善预算") { BudgetEditor(initialDate: date) }.font(.subheadline)
                     }
                 }
             }.padding(.top, 26)
@@ -143,13 +143,14 @@ struct AnalysisView: View {
     }
 }
 struct BudgetDetails: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var store: LedgerStore
     @Binding var date: Date
     var body: some View {
         List {
             MonthSelector(date: $date)
             ForEach(store.ledger.visibleCategories(), id: \.self) { BudgetRow(category: $0, month: LedgerDate.month(date)) }
-            NavigationLink("调整分类预算") { BudgetEditor() }
-        }.listStyle(.plain).ledgerCanvas().navigationTitle("预算与剩余")
+            NavigationLink("调整分类预算") { BudgetEditor(initialDate: date) }
+        }.listStyle(.plain).ledgerCanvas().safeAreaInset(edge: .top) { Button("返回") { dismiss() }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("预算与剩余")
     }
 }

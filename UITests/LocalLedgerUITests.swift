@@ -39,7 +39,7 @@ final class LocalLedgerUITests: XCTestCase {
         app.launch(); app.buttons["分析"].tap()
         XCTAssertFalse(app.buttons["饼图"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["spending.categories"].firstMatch.waitForExistence(timeout: 5))
-        app.buttons["设置"].tap()
+        tapSettings(app)
         for _ in 0..<3 {
             if app.buttons["保存一份账本副本"].isHittable { break }
             app.swipeUp()
@@ -62,12 +62,12 @@ final class LocalLedgerUITests: XCTestCase {
             app.swipeUp()
         }
         app.buttons["查看分类预算"].tap()
-        XCTAssertTrue(app.navigationBars["预算与剩余"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["返回"].waitForExistence(timeout: 5))
     }
 
     @MainActor func testGuideAndSearch() throws {
         let app = XCUIApplication(); app.launch()
-        app.buttons["设置"].tap()
+        tapSettings(app)
         app.buttons["快速上手指南"].tap()
         XCTAssertTrue(app.staticTexts["生活有数，\n花钱有度。"].waitForExistence(timeout: 5))
         let guide = XCTAttachment(screenshot: app.screenshot()); guide.name = "新版上手指南"; guide.lifetime = .keepAlways; add(guide)
@@ -140,8 +140,16 @@ final class LocalLedgerUITests: XCTestCase {
         app.buttons["作废此笔"].tap()
         app.alerts.buttons["作废"].tap()
         XCTAssertFalse(app.staticTexts[merchant].exists)
-        app.switches["显示已作废"].switches.firstMatch.tap()
-        XCTAssertTrue(app.staticTexts[merchant].exists)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        app.buttons["记账"].tap()
+        let showVoided = app.switches["显示已作废"]
+        for _ in 0..<5 { if showVoided.isHittable { break }; app.swipeDown() }
+        XCTAssertTrue(showVoided.waitForExistence(timeout: 5))
+        showVoided.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        XCTAssertEqual(showVoided.value as? String, "1")
+        for _ in 0..<4 { if app.staticTexts[merchant].exists { break }; app.swipeUp() }
+        XCTAssertTrue(app.staticTexts[merchant].waitForExistence(timeout: 5))
     }
 
     @MainActor func testMerchantCategoryMemory() throws {
@@ -162,12 +170,11 @@ final class LocalLedgerUITests: XCTestCase {
     }
 
     @MainActor func testStudentBudgetSettings() throws {
-        let app = XCUIApplication(); app.launch(); app.buttons["设置"].tap()
+        let app = XCUIApplication(); app.launch(); XCTAssertTrue(app.buttons["设置"].waitForExistence(timeout: 8)); tapSettings(app)
         app.buttons["调整每类能花多少钱"].tap()
-        XCTAssertTrue(app.navigationBars["分类预算"].waitForExistence(timeout: 5))
-        let laundry = app.textFields["budget.洗衣"]
-        for _ in 0..<5 { if laundry.isHittable { break }; app.swipeUp() }
-        app.swipeUp()
+        XCTAssertTrue(app.buttons["返回设置"].waitForExistence(timeout: 5))
+        let laundry = app.textFields["budget.餐饮"]
+        for _ in 0..<4 { if laundry.isHittable { break }; app.swipeUp() }
         laundry.tap()
         if let old = laundry.value as? String, old != "不设预算" { laundry.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count)) }
         laundry.typeText("16")
@@ -175,6 +182,9 @@ final class LocalLedgerUITests: XCTestCase {
         app.buttons["保存预算"].tap()
         XCTAssertTrue(app.alerts["预算"].waitForExistence(timeout: 5))
         app.alerts.buttons["知道了"].tap()
+        app.buttons["返回设置"].tap()
+        app.buttons["调整每类能花多少钱"].tap()
+        XCTAssertEqual(app.textFields["budget.餐饮"].value as? String, "16.00")
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "预算设置"; shot.lifetime = .keepAlways; add(shot)
     }
 }
@@ -253,7 +263,7 @@ extension LocalLedgerUITests {
 
 extension LocalLedgerUITests {
     @MainActor func testSpendingChartModes() throws {
-        let app = XCUIApplication(); app.launch(); app.buttons["分析"].tap()
+        let app = XCUIApplication(); app.launch(); XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10)); app.buttons["分析"].tap()
         let pie = app.buttons["环形"]
         for _ in 0..<4 { if pie.isHittable { break }; app.swipeUp() }
         XCTAssertTrue(pie.waitForExistence(timeout: 5))
@@ -263,7 +273,79 @@ extension LocalLedgerUITests {
             XCTAssertTrue(app.descendants(matching: .any)[identifier].firstMatch.waitForExistence(timeout: 5))
             let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "支出图表-" + style; shot.lifetime = .keepAlways; add(shot)
         }
-        app.terminate(); app.launch(); app.buttons["分析"].tap()
+        app.terminate(); app.launch(); XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10)); app.buttons["分析"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["spending.trend"].firstMatch.waitForExistence(timeout: 5))
+    }
+}
+
+extension LocalLedgerUITests {
+    @MainActor func testEditableCycleAndIndependentBudget() throws {
+        let app = XCUIApplication(); app.launch()
+        tapSettings(app)
+        app.buttons["每期从哪天开始"].tap()
+        app.pickerWheels.firstMatch.adjust(toPickerWheelValue: "每月 1 日")
+        if app.buttons["保存周期设置"].isEnabled {
+            app.buttons["保存周期设置"].tap()
+            app.alerts.buttons["确认修改"].tap()
+        } else { app.buttons["返回设置"].tap() }
+        app.buttons["周期"].tap()
+        let period = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "[0-9]{4}-[0-9]{2}-01 至 [0-9]{4}-[0-9]{2}-[0-9]{2}")).firstMatch
+        XCTAssertTrue(period.waitForExistence(timeout: 5))
+        app.terminate(); app.launch(); app.buttons["周期"].tap()
+        XCTAssertTrue(period.waitForExistence(timeout: 5))
+        app.buttons["下一期"].tap()
+        tapSettings(app)
+        app.buttons["调整每类能花多少钱"].tap()
+        XCTAssertEqual(app.textFields["budget.餐饮"].value as? String, "不设预算")
+        app.buttons["返回设置"].tap()
+        app.buttons["每期从哪天开始"].tap()
+        app.pickerWheels.firstMatch.adjust(toPickerWheelValue: "每月 22 日")
+        app.buttons["保存周期设置"].tap()
+        app.alerts.buttons["确认修改"].tap()
+    }
+}
+
+extension LocalLedgerUITests {
+    @MainActor private func tapSettings(_ app: XCUIApplication) {
+        let settings = app.buttons["设置"]
+        XCTAssertTrue(settings.waitForExistence(timeout: 8))
+        // iPhone Duo's side tab bar reports an invalid accessibility hit point.
+        if settings.isHittable { settings.tap() }
+        else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.895, dy: 0.92)).tap() }
+    }
+}
+
+extension LocalLedgerUITests {
+    @MainActor func testLanguageSwitchAndPersistence() throws {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        func settings() {
+            let tab = ["设置", "Settings", "Réglages"].map { app.buttons[$0] }.first { $0.exists && $0.isHittable }
+            if let tab { tab.tap() } else { app.coordinate(withNormalizedOffset: CGVector(dx: 0.895, dy: 0.92)).tap() }
+        }
+        func choose(_ name: String) {
+            settings()
+            let picker = app.buttons["settings.language"]
+            XCTAssertTrue(picker.waitForExistence(timeout: 5)); picker.tap()
+            app.buttons[name].tap()
+        }
+        choose("English")
+        XCTAssertTrue(app.buttons["Period"].waitForExistence(timeout: 5))
+        settings()
+        XCTAssertTrue(app.staticTexts["My budget"].waitForExistence(timeout: 5))
+        let english = XCTAttachment(screenshot: app.screenshot()); english.name = "English settings"; english.lifetime = .keepAlways; add(english)
+        app.buttons["settings.language"].tap(); app.buttons["Français"].tap()
+        XCTAssertTrue(app.buttons["Période"].waitForExistence(timeout: 5))
+        settings()
+        XCTAssertTrue(app.staticTexts["Mon budget"].waitForExistence(timeout: 5))
+        let french = XCTAttachment(screenshot: app.screenshot()); french.name = "French settings"; french.lifetime = .keepAlways; add(french)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["Période"].waitForExistence(timeout: 10))
+        app.buttons["Add an entry"].exists ? app.buttons["Add an entry"].tap() : app.buttons["Ajouter une dépense"].tap()
+        XCTAssertTrue(app.textFields["Montant (USD, ex. 12.50)"].waitForExistence(timeout: 5))
+        let form = XCTAttachment(screenshot: app.screenshot()); form.name = "French entry"; form.lifetime = .keepAlways; add(form)
+        app.buttons["Fermer"].tap()
+        choose("中文")
+        XCTAssertTrue(app.buttons["周期"].waitForExistence(timeout: 5))
     }
 }

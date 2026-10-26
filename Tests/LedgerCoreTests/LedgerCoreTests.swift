@@ -292,3 +292,138 @@ extension LedgerCoreTests {
         XCTAssertEqual(ambiguous.rows[0].date, "")
     }
 }
+
+extension LedgerCoreTests {
+    func testConfigurableCycleBoundaries() {
+        XCTAssertEqual(LedgerDate.cycleLabel("2026-09", startDay: 1), "2026-09-01 至 2026-09-30")
+        XCTAssertEqual(LedgerDate.cycleKey(for: "2026-10-01", startDay: 1), "2026-10")
+        XCTAssertEqual(LedgerDate.cycleLabel("2026-12", startDay: 22), "2026-12-22 至 2027-01-21")
+        XCTAssertEqual(LedgerDate.cycleLabel("2024-02", startDay: 31), "2024-02-29 至 2024-03-30")
+        XCTAssertEqual(LedgerDate.cycleLabel("2026-02", startDay: 31), "2026-02-28 至 2026-03-30")
+        for start in 1...31 {
+            for month in ["2024-02", "2026-02", "2026-09", "2026-12"] {
+                let end = LedgerDate.cycleEndExclusive(month, startDay: start)
+                let nextKey = String(end.prefix(7))
+                XCTAssertFalse(LedgerDate.inCycle(end, key: month, startDay: start))
+                XCTAssertTrue(LedgerDate.inCycle(end, key: nextKey, startDay: start))
+                XCTAssertEqual(LedgerDate.cycleKey(for: end, startDay: start), nextKey)
+            }
+        }
+    }
+    func testLegacyBudgetPinsOnlyCurrentCycle() throws {
+        var old = Ledger()
+        old.settings.budgets = ["购物": 10000, "餐饮": 20000]
+        old.settings.overrides["2026-10"] = ["购物": nil]
+        old.settings.overrides["2026-11"] = ["餐饮": 9000]
+        old.entries = [entry()]
+        let migrated = try old.usingIndependentBudgets(on: "2026-10-26")
+        XCTAssertEqual(migrated.entries, old.entries)
+        XCTAssertNil(migrated.settings.limit("购物", month: "2026-10"))
+        XCTAssertEqual(migrated.settings.limit("餐饮", month: "2026-10"), 20000)
+        XCTAssertNil(migrated.settings.limit("餐饮", month: "2026-09"))
+        XCTAssertEqual(migrated.settings.limit("餐饮", month: "2026-11"), 9000)
+        XCTAssertNil(migrated.settings.limit("购物", month: "2026-11"))
+        XCTAssertTrue(migrated.settings.budgets.isEmpty)
+        XCTAssertEqual(try migrated.usingIndependentBudgets(on: "2026-12-26"), migrated)
+        XCTAssertEqual(try Backup.decode(Backup.encode(migrated)), migrated)
+    }
+    func testCycleSettingChangesTotalsNotTransactions() throws {
+        var ledger = Ledger()
+        ledger.entries = [Entry(amount: 100, merchant: "Example", date: "2026-10-01", category: "购物"), Entry(amount: 200, merchant: "Example", date: "2026-10-23", category: "购物")]
+        let original = ledger.entries
+        XCTAssertEqual(ledger.cycleSpent(cycle: "2026-10"), 200)
+        ledger.settings.cycleStartDay = 1
+        XCTAssertEqual(ledger.cycleSpent(cycle: "2026-10"), 300)
+        XCTAssertEqual(ledger.entries, original)
+        XCTAssertEqual(try Backup.decode(Backup.encode(ledger)).settings.startDay, 1)
+        ledger.settings.cycleStartDay = 32
+        XCTAssertThrowsError(try ledger.validate())
+    }
+}
+
+
+extension LedgerCoreTests {
+    func testRelativeScreenshotDatesNeverUseImportDayOrPreviousHeading() throws {
+        for relative in ["今天", "昨天", "前天", "Today", "Yesterday"] {
+            XCTAssertTrue(ReceiptParser.parse("\(relative) Cafe USD 12.34").dates.isEmpty)
+            let result = statement(["2026-10-24", "Old Cafe USD 4.00", "\(relative) New Cafe USD 12.34", "Shop USD 5.00"])
+            XCTAssertEqual(result.rows.map(\.date), ["2026-10-24", "", ""])
+            let separated = statement(["2026-10-24", relative, "Cafe USD 12.34"])
+            XCTAssertEqual(separated.rows.first?.date, "")
+        }
+        XCTAssertEqual(statement(["2026-10-24", "2026-10-25 2026-10-26 Cafe USD 12.34"]).rows.first?.date, "")
+        let explicit = statement(["Today 2026-10-26 Cafe USD 12.34"])
+        XCTAssertEqual(explicit.rows.first?.date, "2026-10-26")
+        let undated = Entry(amount: 1234, merchant: "Cafe", date: "", category: "餐饮")
+        XCTAssertThrowsError(try Ledger().addingBatch([undated]))
+    }
+}
+
+
+extension LedgerCoreTests {
+    func testClockMidnightTimeZonesAndDaylightSaving() throws {
+        let parser = ISO8601DateFormatter()
+        let ny = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        let shanghai = try XCTUnwrap(TimeZone(identifier: "Asia/Shanghai"))
+        for (instant, expected) in [
+            ("2026-10-27T03:59:59Z", "2026-10-26"),
+            ("2026-10-27T04:00:00Z", "2026-10-27"),
+            ("2026-11-01T05:59:59Z", "2026-11-01"),
+            ("2026-11-01T06:00:00Z", "2026-11-01"),
+            ("2026-03-08T06:59:59Z", "2026-03-08"),
+            ("2026-03-08T07:00:00Z", "2026-03-08")
+        ] {
+            XCTAssertEqual(LedgerDate.string(try XCTUnwrap(parser.date(from: instant)), timeZone: ny), expected)
+        }
+        let instant = try XCTUnwrap(parser.date(from: "2026-10-27T03:00:00Z"))
+        XCTAssertEqual(LedgerDate.string(instant, timeZone: ny), "2026-10-26")
+        XCTAssertEqual(LedgerDate.string(instant, timeZone: shanghai), "2026-10-27")
+    }
+    func testClockRefreshFollowsCurrentCycleButPreservesHistory() {
+        XCTAssertEqual(LedgerDate.refreshedCycle(selected: "2026-10", previousDay: "2026-11-21", currentDay: "2026-11-22", startDay: 22), "2026-11")
+        XCTAssertEqual(LedgerDate.refreshedCycle(selected: "2026-09", previousDay: "2026-11-21", currentDay: "2026-11-22", startDay: 22), "2026-09")
+        XCTAssertEqual(LedgerDate.refreshedCycle(selected: "2026-12", previousDay: "2026-12-31", currentDay: "2027-01-01", startDay: 1), "2027-01")
+    }
+}
+
+extension LedgerCoreTests {
+    func testChineseBankReceiptKeepsAmountsDatesAndMerchantSource() throws {
+        let source = "您的信用卡于2026年10月26日，在路易威登消费USD100.00元。【中国银行】"
+        let receipt = ReceiptParser.parse(source)
+        XCTAssertEqual(receipt.amounts, [10000])
+        XCTAssertEqual(receipt.dates, ["2026-10-26"])
+        XCTAssertEqual(receipt.merchant, "路易威登")
+        XCTAssertEqual(MerchantDisplay.name(receipt.merchant), "Louis Vuitton")
+        let batch = statement([source])
+        XCTAssertEqual(batch.rows.first?.merchant, "路易威登")
+        XCTAssertEqual(batch.rows.first?.date, "2026-10-26")
+        XCTAssertEqual(batch.rows.first?.amount, "100.00")
+        var ledger = Ledger()
+        try ledger.upsert(Entry(amount: 10000, merchant: receipt.merchant, date: "2026-10-26", category: "购物"))
+        XCTAssertEqual(ledger.rememberedCategory(for: "Louis Vuitton"), "购物")
+        XCTAssertEqual(ledger.entries.first?.merchant, "路易威登")
+        try ledger.upsert(Entry(amount: 6050, merchant: "Hashi Market", date: "2026-10-24", category: "居家"))
+        XCTAssertEqual(ledger.suggestedCategory(for: "HASHI MARKET"), "居家")
+        XCTAssertEqual(MerchantDisplay.name(" HASHI MARKET "), "Hashi Market")
+        XCTAssertEqual(MerchantDisplay.name("未知商店"), "未知商店")
+        XCTAssertEqual(MerchantDisplay.name("H-E Market"), "H-E Market")
+    }
+}
+
+
+extension LedgerCoreTests {
+    func testFrenchManualAmountsAndKnownAliasDuplicates() throws {
+        XCTAssertEqual(Money.inputCents("12,50", decimalComma: true), 1250)
+        XCTAssertEqual(Money.inputCents("12.50", decimalComma: true), 1250)
+        XCTAssertNil(Money.inputCents("1,234", decimalComma: true))
+        XCTAssertNil(Money.inputCents("12,50", decimalComma: false))
+        XCTAssertEqual(Money.inputCents("1,234.50", decimalComma: false), 123450)
+        var ledger = Ledger()
+        try ledger.upsert(Entry(amount: 10000, merchant: "路易威登", date: "2026-10-26", category: "购物"))
+        XCTAssertTrue(ledger.possibleDuplicate(of: Entry(amount: 10000, merchant: "Louis Vuitton", date: "2026-10-26", category: "购物")))
+        XCTAssertFalse(ledger.possibleDuplicate(of: Entry(amount: 10000, merchant: "Louis Cafe", date: "2026-10-26", category: "餐饮")))
+        for currency in ["CAD", "CNY", "EUR"] {
+            XCTAssertNotNil(ReceiptParser.parse("在商店消费\(currency)100.00元").blockedReason)
+        }
+    }
+}
