@@ -10,6 +10,8 @@ struct SettingsView: View {
     @State private var importing = false
     @State private var showGuide = false
     @State private var exporting = false
+    @State private var exportingCurrent = false
+    @AppStorage("lastSuccessfulLedgerExport") private var lastExport = 0.0
     @State private var document: BackupDocument?
     @State private var incoming: Ledger?
     @State private var notice: String?
@@ -37,6 +39,15 @@ struct SettingsView: View {
                     }.disabled(!store.ready)
                     Divider()
                     EditorialSectionTitle(title: "保存与找回", index: "02").padding(.top, 30)
+                    VStack(alignment: .leading, spacing: 8) {
+                        if lastExport > 0 && lastExport <= Date().timeIntervalSince1970 {
+                            Text(L10n.format("最近保存副本：%@", Date(timeIntervalSince1970: lastExport).formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: language)))))
+                        } else { Text("暂无保存副本的时间记录") }
+                        if BackupReminder.isDue(lastExport: lastExport, now: Date(), hasEntries: !store.ledger.entries.isEmpty) {
+                            Text("建议现在保存一份副本，避免手机丢失或误删 App 后无法找回。")
+                        }
+                        Text("提醒仅在这里显示，不会自动上传。副本只包含保存当时的数据。")
+                    }.font(.caption).foregroundStyle(.secondary).padding(.vertical, 12).accessibilityIdentifier("backup.status")
                     Button { exportCurrent() } label: {
                         EditorialAction(title: "保存一份账本副本", detail: "留在“文件”里，换手机时也能找回", symbol: "arrow.up.document")
                     }.disabled(!store.ready)
@@ -47,12 +58,12 @@ struct SettingsView: View {
                     Divider()
                     DisclosureGroup("更多找回选项") {
                         Button("找回上次恢复前的账本") { exportPrevious() }.disabled(!store.ready).padding(.vertical, 12)
-                        Text("如果恢复的文件选错了，可以先保存恢复前的副本，再用它找回记录。").font(.caption).foregroundStyle(.secondary)
+                        Text("这是恢复前的安全副本。导入会合并记录，不会删除后来新增的消费；同一记录内容不同会停止导入，请先核对。").font(.caption).foregroundStyle(.secondary)
                     }.font(.subheadline).padding(.vertical, 20)
                     if !store.ready {
                         Text("账本暂时无法读取，已停止写入保护记录。请保存原始副本后再尝试重新打开，不要删除 App。").font(.subheadline)
                         Button("导出原始文件副本") {
-                            do { document = BackupDocument(data: try Data(contentsOf: store.disk.url)); exporting = true }
+                            do { exportingCurrent = false; document = BackupDocument(data: try Data(contentsOf: store.disk.url)); exporting = true }
                             catch { notice = error.localizedDescription }
                         }.padding(.vertical, 16)
                     }
@@ -86,7 +97,13 @@ struct SettingsView: View {
                     } catch { notice = "未导入：\(error.localizedDescription)" }
                 }
                 .fileExporter(isPresented: $exporting, document: document, contentType: .json, defaultFilename: "USD账本备份-\(LedgerDate.string(Date()))") { result in
-                    switch result { case .success: notice = "账本副本已保存。换手机时，可以用这个文件找回记录。"; case .failure(let error): notice = error.localizedDescription }
+                    switch result {
+                    case .success:
+                        if exportingCurrent { lastExport = Date().timeIntervalSince1970 }
+                        notice = "账本副本已保存。换手机时，可以用这个文件找回记录。"
+                    case .failure(let error): notice = error.localizedDescription
+                    }
+                    exportingCurrent = false
                     document = nil
                 }
                 .alert("找回这份账本？", isPresented: Binding(get: { incoming != nil }, set: { if !$0 { incoming = nil } })) {
@@ -105,12 +122,12 @@ struct SettingsView: View {
         }
     }
     func exportCurrent() {
-        do { document = BackupDocument(data: try Backup.encode(store.ledger)); exporting = true } catch { notice = error.localizedDescription }
+        do { document = BackupDocument(data: try Backup.encode(store.ledger)); exportingCurrent = true; exporting = true } catch { notice = error.localizedDescription }
     }
     func exportPrevious() {
         do {
             let url = store.disk.url.deletingLastPathComponent().appendingPathComponent("before-restore.json")
-            document = BackupDocument(data: try Data(contentsOf: url)); exporting = true
+            document = BackupDocument(data: try Data(contentsOf: url)); exportingCurrent = false; exporting = true
         } catch { notice = "暂无恢复前副本，或副本无法读取。\(error.localizedDescription)" }
     }
 }
@@ -243,6 +260,9 @@ struct CycleEditor: View {
                 if let preview = preview {
                     Text(L10n.period(LedgerDate.shiftMonth(store.ledger.settings.cycleKey(for: store.today), by: 1), settings: preview)).font(.subheadline)
                     Text("以上为下一期的过渡日期。").font(.caption)
+                    if let days = preview.cycleDayCount(LedgerDate.shiftMonth(store.ledger.settings.cycleKey(for: store.today), by: 1)) {
+                        Text(L10n.format("过渡期共 %d 天，请按这段时间单独设置预算。", days)).font(.footnote).accessibilityIdentifier("cycle.transitionDays")
+                    }
                 }
                 Text("本期和历史周期保持不变。新起始日从后续周期生效，中间会有一期较短或较长的过渡期，预算不会自动增减。")
                     .font(.footnote).foregroundStyle(.secondary)

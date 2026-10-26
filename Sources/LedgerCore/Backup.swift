@@ -85,3 +85,11 @@ public struct LedgerDisk {
         #endif
     }
 }
+
+public enum BackupReminder {
+    public static func isDue(lastExport: TimeInterval, now: Date, hasEntries: Bool) -> Bool {
+        guard hasEntries else { return false }
+        guard lastExport.isFinite, lastExport > 0, lastExport <= now.timeIntervalSince1970 else { return true }
+        return now.timeIntervalSince1970 - lastExport >= 7 * 24 * 60 * 60
+    }
+}

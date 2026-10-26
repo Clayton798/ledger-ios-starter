@@ -9,6 +9,7 @@ struct RefundEditor: View {
     @State private var note = ""
     @State private var error: String?
     @State private var confirm = false
+    @FocusState private var inputFocused: Bool
     private var entry: Entry? { store.ledger.entries.first { $0.id == entryID } }
     var body: some View {
         NavigationStack {
@@ -19,19 +20,25 @@ struct RefundEditor: View {
                         LabeledContent("原消费", value: Money.display(entry.amount))
                         LabeledContent("已退款", value: Money.display(entry.refunded))
                         LabeledContent("可退款", value: Money.display(entry.netAmount))
+                        Text(L10n.format("这笔退款将减少 %@ 的支出。", L10n.period(store.ledger.settings.cycleKey(for: entry.date), settings: store.ledger.settings)))
+                            .font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("refund.affectedPeriod")
                     }
                     Section("本次退款") {
-                        TextField("金额（USD，例如 12.50）", text: $amount).keyboardType(.decimalPad).accessibilityIdentifier("refund.amount")
+                        TextField("金额（USD，例如 12.50）", text: $amount).keyboardType(.decimalPad).accessibilityIdentifier("refund.amount").focused($inputFocused)
                         Button("退还全部剩余金额") { amount = Money.decimal(entry.netAmount) }
-                        TextField("日期（YYYY-MM-DD）", text: $date).accessibilityIdentifier("refund.date")
-                        TextField("备注（可选）", text: $note)
+                        TextField("日期（YYYY-MM-DD）", text: $date).accessibilityIdentifier("refund.date").focused($inputFocused)
+                        TextField("备注（可选）", text: $note).focused($inputFocused)
                         Text("退款抵扣原消费所属周期，保留实际退款日期，不计为收入。仅记录已经到账的退款。").font(.footnote).foregroundStyle(.secondary)
                     }
                 }
             }.ledgerCanvas().navigationTitle("记录退款")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                    ToolbarItem(placement: .confirmationAction) { Button("确认并保存") { confirm = true }.disabled(entry == nil || entry?.netAmount == 0) }
+                .safeAreaInset(edge: .top) {
+                    HStack {
+                        Button("取消") { dismiss() }
+                        Spacer()
+                        Button("确认并保存") { inputFocused = false; confirm = true }
+                            .disabled(entry == nil || entry?.netAmount == 0)
+                    }.padding(.horizontal, 24).padding(.vertical, 12).background(LedgerStyle.canvas)
                 }
                 .alert("确认退款已到账？", isPresented: $confirm) {
                     Button("取消", role: .cancel) {}

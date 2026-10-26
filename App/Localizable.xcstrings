@@ -6662,6 +6662,213 @@
           }
         }
       }
+    },
+    "预算剩余": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预算剩余"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Budget remaining"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Budget restant"
+          }
+        }
+      }
+    },
+    "仅按已记录消费估算，已扣退款；不是银行卡余额。漏记消费会让剩余额度偏高。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅按已记录消费估算，已扣退款；不是银行卡余额。漏记消费会让剩余额度偏高。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimated from recorded spending, after refunds; this is not your bank balance. Missing purchases overstate what remains."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimation des dépenses enregistrées, remboursements déduits ; ce n’est pas votre solde bancaire. Les achats manquants surestiment le budget restant."
+          }
+        }
+      }
+    },
+    "这笔退款将减少 %@ 的支出。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这笔退款将减少 %@ 的支出。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This refund reduces spending for %@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce remboursement réduit les dépenses de la période %@."
+          }
+        }
+      }
+    },
+    "最近保存副本：%@": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近保存副本：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last backup saved: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernière copie enregistrée : %@"
+          }
+        }
+      }
+    },
+    "建议现在保存一份副本，避免手机丢失或误删 App 后无法找回。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建议现在保存一份副本，避免手机丢失或误删 App 后无法找回。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save a backup now so you can recover your ledger if your phone is lost or the app is deleted."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrez une copie pour retrouver vos données si vous perdez votre téléphone ou supprimez l’app."
+          }
+        }
+      }
+    },
+    "提醒仅在这里显示，不会自动上传。副本只包含保存当时的数据。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提醒仅在这里显示，不会自动上传。副本只包含保存当时的数据。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This reminder stays here; nothing is uploaded automatically. A backup contains only the data present when saved."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce rappel reste ici ; aucun envoi automatique. Une copie contient uniquement les données présentes lors de sa création."
+          }
+        }
+      }
+    },
+    "过渡期共 %d 天，请按这段时间单独设置预算。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "过渡期共 %d 天，请按这段时间单独设置预算。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This transition period lasts %d days. Set a separate budget for that duration."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette période de transition dure %d jours. Définissez un budget pour cette durée."
+          }
+        }
+      }
+    },
+    "这是恢复前的安全副本。导入会合并记录，不会删除后来新增的消费；同一记录内容不同会停止导入，请先核对。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这是恢复前的安全副本。导入会合并记录，不会删除后来新增的消费；同一记录内容不同会停止导入，请先核对。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is the safety copy from before a restore. Import merges entries without deleting later purchases. Conflicting versions of an entry stop the import; review them first."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copie de sécurité précédant une restauration. L’import fusionne les opérations sans supprimer les achats ultérieurs. Des versions différentes d’une même opération bloquent l’import ; vérifiez-les d’abord."
+          }
+        }
+      }
+    },
+    "暂无保存副本的时间记录": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无保存副本的时间记录"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No backup time recorded on this device"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune date de sauvegarde enregistrée sur cet appareil"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

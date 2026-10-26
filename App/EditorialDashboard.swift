@@ -104,7 +104,7 @@ struct DashboardView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 8) {
-                    Text(L10n.text(completeBudget ? (spent > budget ? "已超出" : "还可花") : "预算设置")).font(.caption).foregroundStyle(.secondary)
+                    Text(L10n.text(completeBudget ? (spent > budget ? "已超出" : "预算剩余") : "预算设置")).font(.caption).foregroundStyle(.secondary)
                     if completeBudget {
                         Text(Money.decimal(abs(budget - spent))).font(LedgerStyle.amountFont(23)).foregroundStyle(spent > budget ? .orange : .primary)
                             .accessibilityIdentifier("overview.remaining")
@@ -113,6 +113,8 @@ struct DashboardView: View {
                     }
                 }
             }.padding(.top, 26)
+            Text("仅按已记录消费估算，已扣退款；不是银行卡余额。漏记消费会让剩余额度偏高。")
+                .font(.caption).foregroundStyle(.secondary).padding(.top, 12).accessibilityIdentifier("overview.basis")
             if completeBudget {
                 GeometryReader { g in
                     Rectangle().fill(LedgerStyle.rule.opacity(0.5))

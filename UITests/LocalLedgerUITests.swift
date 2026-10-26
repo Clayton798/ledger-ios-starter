@@ -34,6 +34,18 @@ final class LocalLedgerUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["正在查找所有周期的记录"].exists)
     }
 
+    @MainActor func testBudgetBasisAndBackupReminder() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-lastSuccessfulLedgerExport", "0", "-appLanguage", "zh-Hans"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["overview.basis"].exists)
+        tapSettings(app)
+        for _ in 0..<5 { if app.staticTexts["暂无保存副本的时间记录"].exists { break }; app.swipeUp() }
+        XCTAssertTrue(app.staticTexts["暂无保存副本的时间记录"].exists)
+        XCTAssertTrue(app.buttons["保存一份账本副本"].exists)
+    }
+
     @MainActor func testBundledEditorialFont() throws {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 8))
@@ -389,7 +401,9 @@ extension LocalLedgerUITests {
         app.buttons["记录退款"].tap()
         let refund = app.textFields["refund.amount"]
         XCTAssertTrue(refund.waitForExistence(timeout: 5)); refund.tap(); refund.typeText("5")
-        app.buttons["确认并保存"].tap(); app.alerts.buttons["保存退款"].tap()
+        app.buttons["确认并保存"].tap()
+        XCTAssertTrue(app.alerts.buttons["保存退款"].waitForExistence(timeout: 5))
+        app.alerts.buttons["保存退款"].tap()
         XCTAssertTrue(app.staticTexts["US$20.00"].waitForExistence(timeout: 5))
         app.buttons["返回账目"].tap()
         XCTAssertTrue(app.buttons["手动记一笔"].waitForExistence(timeout: 5))

@@ -2,6 +2,25 @@ import XCTest
 @testable import LedgerCore
 
 final class AuditRegressionTests: XCTestCase {
+    func testBackupReminderBoundaries() {
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        XCTAssertFalse(BackupReminder.isDue(lastExport: 0, now: now, hasEntries: false))
+        XCTAssertTrue(BackupReminder.isDue(lastExport: 0, now: now, hasEntries: true))
+        XCTAssertFalse(BackupReminder.isDue(lastExport: now.timeIntervalSince1970 - 604799, now: now, hasEntries: true))
+        XCTAssertTrue(BackupReminder.isDue(lastExport: now.timeIntervalSince1970 - 604800, now: now, hasEntries: true))
+        XCTAssertTrue(BackupReminder.isDue(lastExport: now.timeIntervalSince1970 + 10, now: now, hasEntries: true))
+    }
+    func testTransitionDayCounts() throws {
+        var settings = BudgetSettings()
+        try settings.schedule(startDay: 1, on: "2026-10-26")
+        XCTAssertEqual(settings.cycleDayCount("2026-10"), 31)
+        XCTAssertEqual(settings.cycleDayCount("2026-11"), 9)
+        XCTAssertEqual(settings.cycleDayCount("2026-12"), 31)
+        var natural = BudgetSettings(); natural.cycleStartDay = 1
+        XCTAssertEqual(natural.cycleDayCount("2024-02"), 29)
+        try natural.schedule(startDay: 22, on: "2026-10-26")
+        XCTAssertEqual(natural.cycleDayCount("2026-11"), 51)
+    }
     func testSearchAcrossPeriodsAndRefundNetTotal() {
         var ledger = Ledger()
         var old = Entry(amount: 2000, merchant: "Example Market", date: "2026-09-24", category: "居家")

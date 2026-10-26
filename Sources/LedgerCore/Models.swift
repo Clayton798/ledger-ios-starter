@@ -382,3 +382,14 @@ extension Ledger {
         entries.filter { $0.voidedAt == nil }.reduce(0) { $0 + $1.netAmount }
     }
 }
+
+extension BudgetSettings {
+    public func cycleDayCount(_ key: String) -> Int? {
+        let f = LedgerDate.formatter()
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        guard let start = f.date(from: cycleStart(key)), let end = f.date(from: cycleEnd(key)), end > start else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar.dateComponents([.day], from: start, to: end).day
+    }
+}
