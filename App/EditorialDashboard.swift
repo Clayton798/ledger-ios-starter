@@ -32,6 +32,7 @@ struct EditorialSectionTitle: View {
 struct DashboardView: View {
     @EnvironmentObject private var store: LedgerStore
     @Binding var date: Date
+    @State private var showBudget = false
     @State private var draft: Draft?
     var cycle: String { LedgerDate.month(date) }
     var spent: Int { store.ledger.cycleSpent(cycle: cycle) }
@@ -40,7 +41,7 @@ struct DashboardView: View {
     var completeBudget: Bool { !limits.isEmpty && limits.count == categories.count }
     var budget: Int { limits.reduce(0, +) }
     var recent: [Entry] {
-        Array(store.ledger.entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle, startDay: store.ledger.settings.startDay) }
+        Array(store.ledger.entries.filter { $0.voidedAt == nil && store.ledger.settings.inCycle($0.date, key: cycle) }
             .sorted { $0.date == $1.date ? $0.createdAt > $1.createdAt : $0.date > $1.date }.prefix(3))
     }
     var body: some View {
@@ -68,10 +69,11 @@ struct DashboardView: View {
                             HStack(alignment: .firstTextBaseline) {
                                 VStack(alignment: .leading, spacing: 7) {
                                     Text(L10n.merchant(entry.merchant)).font(LedgerStyle.labelFont(16)).lineLimit(2)
+                                    if entry.refunded > 0 { Text(L10n.format("已扣除退款 %@", Money.display(entry.refunded))).font(.caption).foregroundStyle(.secondary) }
                                     Text("\(entry.date) · \(L10n.text(Categories.title(entry.category)))").font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength: 12)
-                                Text(Money.decimal(entry.amount)).font(LedgerStyle.amountFont(23)).lineLimit(1).minimumScaleFactor(0.7)
+                                Text(Money.decimal(entry.netAmount)).font(LedgerStyle.amountFont(23)).lineLimit(1).minimumScaleFactor(0.7)
                             }.padding(.vertical, 18).contentShape(Rectangle())
                         }.buttonStyle(.plain)
                         Divider()
@@ -83,6 +85,7 @@ struct DashboardView: View {
                 }.padding(.horizontal, 28).padding(.bottom, 12).frame(maxWidth: 560)
                     .frame(maxWidth: .infinity)
             }.background(LedgerStyle.canvas).toolbar(.hidden, for: .navigationBar)
+                .sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) } }
                 .sheet(item: $draft) { EntryEditor(draft: $0, ledger: store.ledger) }
         }
     }
@@ -106,7 +109,7 @@ struct DashboardView: View {
                         Text(Money.decimal(abs(budget - spent))).font(LedgerStyle.amountFont(23)).foregroundStyle(spent > budget ? .orange : .primary)
                             .accessibilityIdentifier("overview.remaining")
                     } else {
-                        NavigationLink("完善预算") { BudgetEditor(initialDate: date) }.font(.subheadline)
+                        Button("完善预算") { showBudget = true }.font(.subheadline)
                     }
                 }
             }.padding(.top, 26)
@@ -143,6 +146,7 @@ struct AnalysisView: View {
     }
 }
 struct BudgetDetails: View {
+    @State private var showBudget = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var store: LedgerStore
     @Binding var date: Date
@@ -150,7 +154,7 @@ struct BudgetDetails: View {
         List {
             MonthSelector(date: $date)
             ForEach(store.ledger.visibleCategories(), id: \.self) { BudgetRow(category: $0, month: LedgerDate.month(date)) }
-            NavigationLink("调整分类预算") { BudgetEditor(initialDate: date) }
-        }.listStyle(.plain).ledgerCanvas().safeAreaInset(edge: .top) { Button("返回") { dismiss() }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("预算与剩余")
+            Button("调整分类预算") { showBudget = true }
+        }.listStyle(.plain).ledgerCanvas().safeAreaInset(edge: .top) { Button("返回") { dismiss() }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("预算与剩余").sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) } }
     }
 }

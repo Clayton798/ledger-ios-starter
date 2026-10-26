@@ -5888,6 +5888,550 @@
           }
         }
       }
+    },
+    "预算尚未保存": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsaved budget"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Budget non enregistré"
+          }
+        }
+      }
+    },
+    "保存并继续": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save and continue"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer et continuer"
+          }
+        }
+      }
+    },
+    "放弃修改": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard changes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abandonner les modifications"
+          }
+        }
+      }
+    },
+    "继续编辑": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep editing"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuer la modification"
+          }
+        }
+      }
+    },
+    "离开前是否保存本期预算？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save this period’s budget before leaving?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer le budget de cette période avant de quitter ?"
+          }
+        }
+      }
+    },
+    "以上为下一期的过渡日期。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These are the dates of the next, transitional period."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voici les dates de la prochaine période de transition."
+          }
+        }
+      }
+    },
+    "本期和历史周期保持不变。新起始日从后续周期生效，中间会有一期较短或较长的过渡期，预算不会自动增减。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current and past periods stay unchanged. The new start day applies to later periods, with one shorter or longer transition period. Budgets are not adjusted automatically."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La période actuelle et les périodes passées restent inchangées. Le nouveau jour de début s’applique aux périodes suivantes, avec une période de transition plus courte ou plus longue. Les budgets ne sont pas ajustés automatiquement."
+          }
+        }
+      }
+    },
+    "本期和历史周期保持不变；过渡期仍需单独设置预算。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current and past periods stay unchanged. Set the transition period’s budget separately."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les périodes actuelle et passées restent inchangées. Définissez séparément le budget de transition."
+          }
+        }
+      }
+    },
+    "退款日期不能早于消费，累计退款不能超过原金额。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A refund cannot predate the purchase or bring total refunds above the original amount."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un remboursement ne peut pas précéder l’achat et le total remboursé ne peut pas dépasser le montant initial."
+          }
+        }
+      }
+    },
+    "周期设置无效。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid period settings."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paramètres de période invalides."
+          }
+        }
+      }
+    },
+    "原消费不存在或已作废。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The original purchase is missing or voided."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’achat initial est introuvable ou annulé."
+          }
+        }
+      }
+    },
+    "原消费": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original purchase"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Achat initial"
+          }
+        }
+      }
+    },
+    "已退款": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refunded"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remboursé"
+          }
+        }
+      }
+    },
+    "可退款": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available to refund"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Montant remboursable"
+          }
+        }
+      }
+    },
+    "本次退款": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This refund"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce remboursement"
+          }
+        }
+      }
+    },
+    "退还全部剩余金额": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refund the remaining amount"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rembourser le montant restant"
+          }
+        }
+      }
+    },
+    "退款抵扣原消费所属周期，保留实际退款日期，不计为收入。仅记录已经到账的退款。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refunds reduce spending in the original purchase period. The actual refund date is retained; refunds are not income. Record only refunds already received."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les remboursements réduisent les dépenses de la période de l’achat initial. La date réelle du remboursement est conservée ; il ne s’agit pas d’un revenu. Enregistrez uniquement les remboursements reçus."
+          }
+        }
+      }
+    },
+    "记录退款": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Record a refund"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer un remboursement"
+          }
+        }
+      }
+    },
+    "确认退款已到账？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Has the refund been received?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le remboursement a-t-il été reçu ?"
+          }
+        }
+      }
+    },
+    "保存退款": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save refund"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer le remboursement"
+          }
+        }
+      }
+    },
+    "保存后将减少原消费所属周期的支出。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This reduces spending in the original purchase period."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les dépenses de la période de l’achat initial seront réduites."
+          }
+        }
+      }
+    },
+    "退款日期不能是未来日期。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A refund date cannot be in the future."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La date du remboursement ne peut pas être future."
+          }
+        }
+      }
+    },
+    "退款记录": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refund history"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique des remboursements"
+          }
+        }
+      }
+    },
+    "实际支出": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Net spending"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dépense nette"
+          }
+        }
+      }
+    },
+    "作废退款": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Void refund"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler le remboursement"
+          }
+        }
+      }
+    },
+    "作废这笔退款？": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Void this refund?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler ce remboursement ?"
+          }
+        }
+      }
+    },
+    "退款记录仍保留，原消费的实际支出会相应恢复。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The refund record is retained, and the original purchase’s net spending increases accordingly."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le remboursement reste dans l’historique et la dépense nette de l’achat initial augmente en conséquence."
+          }
+        }
+      }
+    },
+    "仅有 $ 不能确定币种。请对照原付款页面确认；退款请在原消费中单独记录；不支持冲正或其他币种。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A $ symbol alone does not identify the currency. Check the original payment screen. Record refunds from the original purchase; reversals and other currencies are not supported."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le symbole $ seul ne permet pas d’identifier la devise. Vérifiez le paiement d’origine. Enregistrez les remboursements depuis l’achat initial ; les extournes et les autres devises ne sont pas prises en charge."
+          }
+        }
+      }
+    },
+    "导出到 iCloud Drive 等位置由你选择，可能触发该服务同步。支持美元消费及关联原消费的退款，不支持汇率换算。预算提醒仅在 App 内显示，不限制银行卡消费。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You choose where to save exports, including iCloud Drive, which may sync them. USD purchases and linked refunds are supported; currency conversion is not. Budget reminders appear only in the app and do not limit card spending."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous choisissez où enregistrer les exports, notamment dans iCloud Drive, qui peut les synchroniser. Les achats en USD et leurs remboursements sont pris en charge, sans conversion de devise. Les rappels de budget restent dans l’app et ne limitent pas les paiements par carte."
+          }
+        }
+      }
+    },
+    "检测到退款、冲正或负金额。退款请打开原消费，选择“记录退款”；不要记作新支出。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refund, reversal or negative amount detected. For a refund, open the original purchase and choose “Record a refund”. Do not add it as a new purchase."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remboursement, extourne ou montant négatif détecté. Ouvrez l’achat initial et choisissez « Enregistrer un remboursement ». Ne l’ajoutez pas comme nouvelle dépense."
+          }
+        }
+      }
+    },
+    "金额单位 USD。留空表示不设预算，0 表示不计划支出。未保存的修改会保留为草稿，不计入正式预算。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amounts are in USD. Leave blank for no budget, or enter 0 for no planned spending. Unsaved changes remain drafts and do not affect the saved budget."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les montants sont en USD. Laissez vide pour ne pas définir de budget, ou saisissez 0 si aucune dépense n’est prévue. Les modifications non enregistrées restent des brouillons sans effet sur le budget enregistré."
+          }
+        }
+      }
+    },
+    "查看当前周期与后续安排": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current period and upcoming changes"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Période actuelle et modifications à venir"
+          }
+        }
+      }
+    },
+    "返回账目": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to entries"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retour aux opérations"
+          }
+        }
+      }
+    },
+    "已扣除退款 %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refund deducted: %@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remboursement déduit : %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

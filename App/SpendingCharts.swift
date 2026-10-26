@@ -80,14 +80,14 @@ struct SpendingCharts: View {
     private var total: Int { ledger.cycleSpent(cycle: cycle) }
     private var slices: [SpendingSlice] { spendingSlices(ledger, cycle: cycle) }
     private var days: [SpendingDay] {
-        let rows = ledger.entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle, startDay: ledger.settings.startDay) }
-        let sums = Dictionary(grouping: rows, by: \.date).mapValues { $0.reduce(0) { $0 + $1.amount } }
-        let end = LedgerDate.cycleEndExclusive(cycle, startDay: ledger.settings.startDay)
+        let rows = ledger.entries.filter { $0.voidedAt == nil && ledger.settings.inCycle($0.date, key: cycle) }
+        let sums = Dictionary(grouping: rows, by: \.date).mapValues { $0.reduce(0) { $0 + $1.netAmount } }
+        let end = ledger.settings.cycleEnd(cycle)
         let today = store.today
         let cutoff = max(today, rows.map(\.date).max() ?? today)
-        guard var day = LedgerDate.formatter().date(from: LedgerDate.cycleStart(cycle, startDay: ledger.settings.startDay)) else { return [] }
+        guard var day = LedgerDate.formatter().date(from: ledger.settings.cycleStart(cycle)) else { return [] }
         var result: [SpendingDay] = []
-        for _ in 0..<31 {
+        for _ in 0..<62 {
             let key = LedgerDate.string(day)
             guard key < end && key <= cutoff else { break }
             result.append(SpendingDay(id: key, date: day, cents: sums[key] ?? 0))

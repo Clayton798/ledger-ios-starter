@@ -85,6 +85,21 @@ public enum Categories {
     }
 }
 
+public struct Refund: Codable, Equatable, Identifiable, Sendable {
+    public var id: String = UUID().uuidString
+    public var amount: Int
+    public var date: String
+    public var note: String?
+    public var voidedAt: String?
+    public init(amount: Int, date: String, note: String? = nil) { self.amount = amount; self.date = date; self.note = note }
+}
+
+public struct CycleRule: Codable, Equatable, Sendable {
+    public var month: String
+    public var startDay: Int
+    public var firstStart: String
+}
+
 public struct Entry: Codable, Equatable, Identifiable, Sendable {
     public var id: String
     public var amount: Int
@@ -98,12 +113,19 @@ public struct Entry: Codable, Equatable, Identifiable, Sendable {
     public var note: String?
     public var updatedAt: String?
     public var voidedAt: String?
+    public var refunds: [Refund]? = nil
+    public var refunded: Int { (refunds ?? []).filter { $0.voidedAt == nil }.reduce(0) { $0 + $1.amount } }
+    public var netAmount: Int { amount - refunded }
     public init(id: String = UUID().uuidString, amount: Int, merchant: String, date: String, category: String, fingerprint: String = "", orderHash: String = "") {
         self.id = id; self.amount = amount; self.merchant = merchant; self.date = date; self.category = category
         self.fingerprint = fingerprint; self.orderHash = orderHash; self.createdAt = ISO8601DateFormatter().string(from: Date())
     }
     public func validate() throws {
         guard !id.isEmpty, id.count <= 128, amount > 0, amount <= Money.maximum, currency == "USD", LedgerDate.valid(date), Categories.all.contains(category), !merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, merchant.count <= 100, !createdAt.isEmpty, fingerprint.count <= 256, orderHash.count <= 256, (note?.count ?? 0) <= 500 else { throw LedgerError.invalid("交易字段无效：只接受有效日期、商家、分类和正数 USD 美分。") }
+        let items = refunds ?? []
+        guard items.count <= 1000, Set(items.map(\.id)).count == items.count,
+              items.allSatisfy({ !$0.id.isEmpty && $0.amount > 0 && $0.amount <= amount && LedgerDate.valid($0.date) && $0.date >= date && ($0.note?.count ?? 0) <= 500 }),
+              refunded <= amount else { throw LedgerError.invalid("退款日期不能早于消费，累计退款不能超过原金额。") }
     }
 }
 
@@ -112,6 +134,7 @@ public struct BudgetSettings: Codable, Equatable, Sendable {
     public var currency = "USD"
     public var cycleStartDay: Int? = nil
     public var cycleBudgetsOnly: Bool? = nil
+    public var cycleRules: [CycleRule]? = nil
     public var startDay: Int { cycleStartDay ?? 22 }
     public var budgets: [String: Int?] = [:]
     public var overrides: [String: [String: Int?]] = [:]
@@ -122,7 +145,17 @@ public struct BudgetSettings: Codable, Equatable, Sendable {
     }
     public func validate() throws {
         let sets = [budgets] + Array(overrides.values)
-        guard version == 2, currency == "USD", (1...31).contains(startDay), overrides.keys.allSatisfy(LedgerDate.validMonth), sets.allSatisfy({ dict in dict.allSatisfy { Categories.all.contains($0.key) && ($0.value == nil || (0...Money.maximum).contains($0.value!)) } }) else { throw LedgerError.invalid("预算必须是 USD v2，有效月份和非负整数美分。") }
+        guard (2...3).contains(version), currency == "USD", (1...31).contains(startDay), overrides.keys.allSatisfy(LedgerDate.validMonth), sets.allSatisfy({ dict in dict.allSatisfy { Categories.all.contains($0.key) && ($0.value == nil || (0...Money.maximum).contains($0.value!)) } }) else { throw LedgerError.invalid("预算必须是 USD v2，有效月份和非负整数美分。") }
+        let rules = cycleRules ?? []
+        guard rules.count <= 1200, rules == rules.sorted(by: { $0.month < $1.month }), Set(rules.map(\.month)).count == rules.count else { throw LedgerError.invalid("周期设置无效。") }
+        var previous = BudgetSettings(); previous.cycleStartDay = cycleStartDay
+        for rule in rules {
+            guard LedgerDate.validMonth(rule.month), (1...31).contains(rule.startDay), LedgerDate.valid(rule.firstStart),
+                  rule.firstStart == previous.cycleStart(rule.month), rule.firstStart < LedgerDate.cycleStart(LedgerDate.shiftMonth(rule.month, by: 1), startDay: rule.startDay)
+            else { throw LedgerError.invalid("周期设置无效。") }
+            previous.cycleRules = (previous.cycleRules ?? []) + [rule]
+        }
+        guard rules.isEmpty || version >= 3 else { throw LedgerError.invalid("周期设置无效。") }
     }
 }
 
@@ -134,7 +167,8 @@ public struct Ledger: Codable, Equatable, Sendable {
     public var settings = BudgetSettings()
     public init() {}
     public func validate() throws {
-        guard format == "LocalLedger", version == 1, currency == "USD", entries.count <= 100_000, Set(entries.map(\.id)).count == entries.count else { throw LedgerError.invalid("账本格式、币种或记录数量无效。") }
+        guard format == "LocalLedger", (1...2).contains(version), currency == "USD", entries.count <= 100_000, Set(entries.map(\.id)).count == entries.count else { throw LedgerError.invalid("账本格式、币种或记录数量无效。") }
+        guard version >= 2 || (settings.version == 2 && entries.allSatisfy { ($0.refunds ?? []).isEmpty }) else { throw LedgerError.invalid("账本格式、币种或记录数量无效。") }
         try settings.validate(); try entries.forEach { try $0.validate() }
     }
     /// Most recently saved/edited non-void transaction for the exact normalized merchant.
@@ -159,7 +193,7 @@ public struct Ledger: Codable, Equatable, Sendable {
         rememberedCategory(for: merchant) ?? Categories.suggest(merchant)
     }
     public func spent(category: String? = nil, month: String) -> Int {
-        entries.filter { $0.voidedAt == nil && $0.date.hasPrefix(month + "-") && (category == nil || $0.category == category) }.reduce(0) { $0 + $1.amount }
+        entries.filter { $0.voidedAt == nil && $0.date.hasPrefix(month + "-") && (category == nil || $0.category == category) }.reduce(0) { $0 + $1.netAmount }
     }
     public func status(category: String, month: String) -> String {
         guard let limit = settings.limit(category, month: month) else { return "未设预算" }
@@ -177,8 +211,10 @@ public struct Ledger: Codable, Equatable, Sendable {
     public mutating func upsert(_ entry: Entry) throws {
         try entry.validate()
         guard !duplicate(of: entry) else { throw LedgerError.duplicate }
-        if let i = entries.firstIndex(where: { $0.id == entry.id }) { entries[i] = entry } else { entries.append(entry) }
-        try validate()
+        var next = self
+        if !(entry.refunds ?? []).isEmpty { next.version = 2 }
+        if let i = next.entries.firstIndex(where: { $0.id == entry.id }) { next.entries[i] = entry } else { next.entries.append(entry) }
+        try next.validate(); self = next
     }
     public func merging(_ imported: Ledger) throws -> Ledger {
         try imported.validate(); var result = self
@@ -193,6 +229,7 @@ public struct Ledger: Codable, Equatable, Sendable {
             }
         }
         result.settings = imported.settings
+        result.version = max(version, imported.version)
         try result.validate(); return result
     }
 }
@@ -235,7 +272,7 @@ extension Ledger {
         guard LedgerDate.valid(day) else { throw LedgerError.invalid("迁移日期无效。") }
         guard settings.cycleBudgetsOnly != true else { return self }
         var next = self
-        let key = LedgerDate.cycleKey(for: day, startDay: settings.startDay)
+        let key = settings.cycleKey(for: day)
         var current = settings.overrides[key] ?? [:]
         for (category, value) in settings.budgets where !current.keys.contains(category) { current[category] = .some(value) }
         if !current.isEmpty { next.settings.overrides[key] = current }
@@ -247,7 +284,7 @@ extension Ledger {
 }
 extension Ledger {
     public func cycleSpent(category: String? = nil, cycle: String) -> Int {
-        entries.filter { $0.voidedAt == nil && LedgerDate.inCycle($0.date, key: cycle, startDay: settings.startDay) && (category == nil || $0.category == category) }.reduce(0) { $0 + $1.amount }
+        entries.filter { $0.voidedAt == nil && settings.inCycle($0.date, key: cycle) && (category == nil || $0.category == category) }.reduce(0) { $0 + $1.netAmount }
     }
     public func cycleStatus(category: String, cycle: String) -> String {
         guard let limit = settings.limit(category, month: cycle) else { return "未设预算" }
@@ -267,5 +304,49 @@ public enum MerchantDisplay {
         case "hashimarket": return "Hashi Market"
         default: return original
         }
+    }
+}
+
+
+extension LedgerDate {
+    public static func shiftMonth(_ key: String, by offset: Int) -> String {
+        guard let date = formatter().date(from: key + "-01"), let next = Calendar(identifier: .gregorian).date(byAdding: .month, value: offset, to: date) else { return "" }
+        return month(next)
+    }
+}
+extension BudgetSettings {
+    public var plannedStartDay: Int { cycleRules?.last?.startDay ?? startDay }
+    public func cycleStart(_ key: String) -> String {
+        guard let rule = (cycleRules ?? []).last(where: { $0.month <= key }) else { return LedgerDate.cycleStart(key, startDay: startDay) }
+        return key == rule.month ? rule.firstStart : LedgerDate.cycleStart(key, startDay: rule.startDay)
+    }
+    public func cycleEnd(_ key: String) -> String { cycleStart(LedgerDate.shiftMonth(key, by: 1)) }
+    public func inCycle(_ day: String, key: String) -> Bool { LedgerDate.valid(day) && LedgerDate.validMonth(key) && day >= cycleStart(key) && day < cycleEnd(key) }
+    public func cycleKey(for day: String) -> String {
+        guard LedgerDate.valid(day) else { return "" }
+        let key = String(day.prefix(7))
+        return inCycle(day, key: key) ? key : LedgerDate.shiftMonth(key, by: -1)
+    }
+    public func selection(_ date: Date) -> Date { LedgerDate.formatter().date(from: cycleKey(for: LedgerDate.string(date)) + "-01") ?? date }
+    public func cycleLabel(_ key: String) -> String {
+        guard let end = LedgerDate.formatter().date(from: cycleEnd(key)), let last = Calendar(identifier: .gregorian).date(byAdding: .day, value: -1, to: end) else { return key }
+        return cycleStart(key) + " 至 " + LedgerDate.string(last)
+    }
+    public mutating func schedule(startDay day: Int, on today: String) throws {
+        guard LedgerDate.valid(today), (1...31).contains(day) else { throw LedgerError.invalid("周期设置无效。") }
+        let key = LedgerDate.shiftMonth(cycleKey(for: today), by: 1)
+        var next = self
+        next.cycleRules = (cycleRules ?? []).filter { $0.month < key }
+        let first = next.cycleStart(key)
+        next.cycleRules = (next.cycleRules ?? []) + [CycleRule(month: key, startDay: day, firstStart: first)]
+        next.version = 3
+        try next.validate(); self = next
+    }
+}
+extension Ledger {
+    public mutating func addRefund(_ refund: Refund, to id: String) throws {
+        guard var entry = entries.first(where: { $0.id == id }), entry.voidedAt == nil else { throw LedgerError.invalid("原消费不存在或已作废。") }
+        entry.refunds = (entry.refunds ?? []) + [refund]
+        try upsert(entry)
     }
 }

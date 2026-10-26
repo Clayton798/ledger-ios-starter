@@ -14,6 +14,9 @@ struct EntryEditor: View {
     @State private var error: String?
     @State private var pending: Entry?
     @State private var askVoid = false
+    @State private var showRefund = false
+    @State private var refundToVoid: String?
+    private var currentEntry: Entry? { store.ledger.entries.first { $0.id == draft.entry?.id } }
     @State private var savedMessage: String?
     init(draft: Draft, ledger: Ledger) {
         self.draft = draft
@@ -71,11 +74,40 @@ struct EntryEditor: View {
                         }
                         Text("请核对上方信息。点击右上方“确认并保存”即确认这是一笔正向美元消费。")
                             .font(.footnote)
-                        Text("仅有 $ 不能确定币种。请对照原付款页面确认；本版不记退款、冲正或其他币种。").font(.caption).foregroundStyle(.secondary)
+                        Text("仅有 $ 不能确定币种。请对照原付款页面确认；退款请在原消费中单独记录；不支持冲正或其他币种。").font(.caption).foregroundStyle(.secondary)
                     }
-                    if draft.entry != nil { Section { Button("作废此笔", role: .destructive) { askVoid = true } } }
+                    if let current = currentEntry {
+                        Section("退款记录") {
+                            LabeledContent("实际支出", value: Money.display(current.netAmount))
+                            ForEach(current.refunds ?? []) { refund in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(refund.date + " · " + Money.display(refund.amount))
+                                        if let note = refund.note { Text(note).font(.caption) }
+                                        if refund.voidedAt != nil { Text("已作废").font(.caption) }
+                                    }
+                                    Spacer()
+                                    if refund.voidedAt == nil { Button("作废退款", role: .destructive) { refundToVoid = refund.id }.font(.caption) }
+                                }
+                            }
+                            Button("记录退款") { showRefund = true }.disabled(current.netAmount == 0)
+                            Button("返回账目") { dismiss() }
+                        }
+                        Section { Button("作废此笔", role: .destructive) { askVoid = true } }
+                    }
                 }
             }.ledgerCanvas().scrollDismissesKeyboard(.interactively).navigationTitle(draft.entry == nil ? "核对并保存" : "编辑记录")
+                .sheet(isPresented: $showRefund) { if let current = currentEntry { RefundEditor(entryID: current.id) } }
+                .alert("作废这笔退款？", isPresented: Binding(get: { refundToVoid != nil }, set: { if !$0 { refundToVoid = nil } })) {
+                    Button("取消", role: .cancel) { refundToVoid = nil }
+                    Button("作废退款", role: .destructive) {
+                        if var current = currentEntry, let index = current.refunds?.firstIndex(where: { $0.id == refundToVoid }) {
+                            current.refunds?[index].voidedAt = ISO8601DateFormatter().string(from: Date())
+                            do { try store.save(current) } catch { self.error = error.localizedDescription }
+                        }
+                        refundToVoid = nil
+                    }
+                } message: { Text("退款记录仍保留，原消费的实际支出会相应恢复。") }
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } }
                     if !blocked {
@@ -101,7 +133,7 @@ struct EntryEditor: View {
     func prepareSave() {
         guard currencyConfirmed, !blocked else { error = "请确认美元币种；退款或其他币种不能保存。"; return }
         guard let cents = L10n.cents(amount), cents > 0 else { error = "请输入大于 0 的美元金额，最多两位小数。"; return }
-        var entry = draft.entry ?? Entry(amount: cents, merchant: merchant, date: date, category: category, fingerprint: draft.receipt?.fingerprint ?? "", orderHash: draft.receipt?.orderHash ?? "")
+        var entry = currentEntry ?? draft.entry ?? Entry(amount: cents, merchant: merchant, date: date, category: category, fingerprint: draft.receipt?.fingerprint ?? "", orderHash: draft.receipt?.orderHash ?? "")
         entry.note = note.isEmpty ? nil : note
         entry.amount = cents; entry.merchant = merchant.trimmingCharacters(in: .whitespacesAndNewlines); entry.date = date.trimmingCharacters(in: .whitespacesAndNewlines); entry.category = category
         if draft.entry != nil { entry.updatedAt = ISO8601DateFormatter().string(from: Date()) }
@@ -114,8 +146,8 @@ struct EntryEditor: View {
     func save(_ entry: Entry) {
         do {
             try store.save(entry)
-            let month = LedgerDate.cycleKey(for: entry.date, startDay: store.ledger.settings.startDay), used = store.ledger.cycleSpent(category: entry.category, cycle: month)
-            var message = L10n.format("%@ · %@ · 已花 %@", L10n.period(month, startDay: store.ledger.settings.startDay), L10n.text(Categories.title(entry.category)), Money.display(used))
+            let month = store.ledger.settings.cycleKey(for: entry.date), used = store.ledger.cycleSpent(category: entry.category, cycle: month)
+            var message = L10n.format("%@ · %@ · 已花 %@", L10n.period(month, settings: store.ledger.settings), L10n.text(Categories.title(entry.category)), Money.display(used))
             if let limit = store.ledger.settings.limit(entry.category, month: month) {
                 message += "\n" + L10n.format("%@ · %@ %@", L10n.text(store.ledger.cycleStatus(category: entry.category, cycle: month)), L10n.text(used > limit ? "超出" : "剩余"), Money.display(abs(limit - used)))
             } else { message += "\n" + L10n.text("尚未设置此分类预算。") }

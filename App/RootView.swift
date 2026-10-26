@@ -29,7 +29,7 @@ struct RootView: View {
         }.id(language).tint(LedgerStyle.accent)
             .opacity(appeared ? 1 : 0)
             .onAppear {
-                if !appeared { cycleDate = LedgerDate.cycleSelection(Date(), startDay: store.ledger.settings.startDay) }
+                if !appeared { cycleDate = store.ledger.settings.selection(Date()) }
                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) { appeared = true }
                 if !welcomeCompleted && store.ready {
                     if store.ledger.entries.isEmpty && store.ledger.settings.budgets.values.allSatisfy({ $0 == nil }) && store.ledger.settings.overrides.values.allSatisfy({ $0.values.allSatisfy({ $0 == nil }) }) {
@@ -38,7 +38,7 @@ struct RootView: View {
                 }
             }
             .onChange(of: store.ledger.settings.startDay) { _, _ in
-                cycleDate = LedgerDate.cycleSelection(Date(), startDay: store.ledger.settings.startDay)
+                cycleDate = store.ledger.settings.selection(Date())
             }
             .onReceive(dayCheck) { _ in refreshClock() }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in refreshClock() }
@@ -51,9 +51,9 @@ struct RootView: View {
         let selected = String(LedgerDate.string(cycleDate, timeZone: clockTimeZone).prefix(7))
         let oldDay = store.today
         store.refreshToday()
-        let key = LedgerDate.refreshedCycle(selected: selected, previousDay: oldDay, currentDay: store.today, startDay: store.ledger.settings.startDay)
+        let key = selected == store.ledger.settings.cycleKey(for: oldDay) ? store.ledger.settings.cycleKey(for: store.today) : selected
         clockTimeZone = .current
-        if let refreshed = LedgerDate.formatter().date(from: LedgerDate.cycleStart(key, startDay: store.ledger.settings.startDay)) {
+        if let refreshed = LedgerDate.formatter().date(from: key + "-01") {
             cycleDate = refreshed
         }
     }
@@ -65,7 +65,7 @@ struct MonthSelector: View {
     var body: some View {
         HStack {
             Button { move(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("上一期")
-            Spacer(); Text(L10n.period(LedgerDate.month(date), startDay: store.ledger.settings.startDay)).font(.caption).monospacedDigit(); Spacer()
+            Spacer(); Text(L10n.period(LedgerDate.month(date), settings: store.ledger.settings)).font(.caption).monospacedDigit(); Spacer()
             Button { move(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("下一期")
         }.buttonStyle(.borderless)
     }
@@ -135,18 +135,19 @@ struct EntriesView: View {
                     }.padding(.vertical, 12)
                     Divider()
                     Toggle("显示已作废", isOn: $showVoided).font(.caption).tint(LedgerStyle.accent).padding(.vertical, 14)
-                    let rows = store.ledger.entries.filter { LedgerDate.inCycle($0.date, key: LedgerDate.month(date), startDay: store.ledger.settings.startDay) && (showVoided || $0.voidedAt == nil) && (search.isEmpty || ($0.merchant + " " + L10n.merchant($0.merchant) + " " + ($0.note ?? "") + " " + Categories.title($0.category) + " " + L10n.text(Categories.title($0.category))).localizedCaseInsensitiveContains(search)) }.sorted { $0.date == $1.date ? $0.createdAt > $1.createdAt : $0.date > $1.date }
+                    let rows = store.ledger.entries.filter { store.ledger.settings.inCycle($0.date, key: LedgerDate.month(date)) && (showVoided || $0.voidedAt == nil) && (search.isEmpty || ($0.merchant + " " + L10n.merchant($0.merchant) + " " + ($0.note ?? "") + " " + Categories.title($0.category) + " " + L10n.text(Categories.title($0.category))).localizedCaseInsensitiveContains(search)) }.sorted { $0.date == $1.date ? $0.createdAt > $1.createdAt : $0.date > $1.date }
                     if rows.isEmpty { ContentUnavailableView(LocalizedStringKey(search.isEmpty ? "从第一笔开始" : "没有找到匹配记录"), systemImage: search.isEmpty ? "square.and.pencil" : "magnifyingglass", description: Text(L10n.text(search.isEmpty ? "选择付款截图，或手动记录今天的消费。" : "试试其他商家、分类或备注关键词。"))) }
                     ForEach(rows) { entry in
                         Button { draft = Draft(entry: entry) } label: {
                             HStack(alignment: .firstTextBaseline, spacing: 16) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(L10n.merchant(entry.merchant)).font(LedgerStyle.labelFont(16)).foregroundStyle(.primary)
+                                    if entry.refunded > 0 { Text(L10n.format("已扣除退款 %@", Money.display(entry.refunded))).font(.caption).foregroundStyle(.secondary) }
                                     Text("\(entry.date) · \(L10n.text(Categories.title(entry.category)))\(entry.voidedAt == nil ? "" : L10n.text(" · 已作废"))").font(.caption).foregroundStyle(.secondary)
                                     if let note = entry.note, !note.isEmpty { Text(note).font(.caption).foregroundStyle(.secondary) }
                                 }
                                 Spacer(minLength: 0)
-                                Text(Money.display(entry.amount)).font(LedgerStyle.amountFont(21)).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.65)
+                                Text(Money.display(entry.netAmount)).font(LedgerStyle.amountFont(21)).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.65)
                             }.padding(.vertical, 20).contentShape(Rectangle())
                         }.buttonStyle(.plain)
                         Divider()

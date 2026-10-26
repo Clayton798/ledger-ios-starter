@@ -36,7 +36,7 @@ public enum ReceiptParser {
         if has(#"(?<![A-Za-z])(?:CNY|RMB|HKD|CAD|AUD|SGD|NZD|TWD|EUR|JPY|GBP|KRW|INR|CHF|THB|MYR|PHP|IDR|VND|AED|SAR|MXN|BRL|ZAR)(?![A-Za-z])|人民币|港币|港元|欧元|日元|英镑|加元|加拿大元|澳元|澳币|新加坡元|新币|台币|韩元|卢比|瑞士法郎|泰铢|[¥￥€£₹₩]|(?:HK|CA|AU|NZ|SG|NT)\s*\$|\b(?:C|A|S)\$"#, text) {
             result.blockedReason = "检测到其他币种或混合币种。本版仅记 USD，不换汇；请改选仅包含美元消费的截图。"
         } else if has(#"退款成功|已退款|已退货|部分退款|退款到账|退款已完成|\bpartial(?:ly)?\s+refund(?:ed)?\b|\brefund\s+amount\s*[:：]?\s*(?:USD|US\$|\$)?\s*[0-9]|退款处理中|退款中|退款金额\s*[:：]?\s*(?:USD|US\$|\$)?\s*[0-9]|(?:交易|订单|支付)(?:状态\s*[:：]?\s*)?(?:已)?(?:撤销|冲正)|已撤销|已冲正|冲正成功|退货成功|\brefunded\b|\brefund\s+(?:completed|successful|pending|processing)\b|\b(?:payment|transaction|order)\s+(?:reversed|voided)\b|\bstatus\s*:\s*(?:refund|reversed|voided)\b"#, text) || has(#"[-−]\s*[0-9][0-9,.]*\s*(?:USD|美元|美金)|\(\s*[0-9][0-9,.]*\s*(?:USD|美元|美金)\s*\)|[-−]\s*(?:US\s*\$|\$|USD|美元)\s*[0-9]|(?:实付|支付金额|交易金额|amount|total)[:：\s]*[-−]\s*[0-9]|(?:USD|US\s*\$|\$|美元)\s*[-−]\s*[0-9]|\(\s*(?:USD|US\$|\$)\s*[0-9]"#, text.replacingOccurrences(of: #"20[0-9]{2}[-/.][0-9]{1,2}[-/.][0-9]{1,2}"#, with: "", options: .regularExpression)) {
-            result.blockedReason = "检测到退款、冲正或负金额。本版只记录正向消费，不支持退款冲抵；不要将退款记作新支出。"
+            result.blockedReason = "检测到退款、冲正或负金额。退款请打开原消费，选择“记录退款”；不要记作新支出。"
         } else if has(#"待支付|支付失败|交易失败|处理中|\b(?:payment|transaction)\s+(?:failed|pending|processing)\b"#, text) {
             result.blockedReason = "支付尚未成功，不能记作已发生消费。"
         }

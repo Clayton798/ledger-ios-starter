@@ -281,28 +281,78 @@ extension LocalLedgerUITests {
 extension LocalLedgerUITests {
     @MainActor func testEditableCycleAndIndependentBudget() throws {
         let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        let predicate = NSPredicate(format: "label MATCHES %@", "[0-9]{4}-[0-9]{2}-[0-9]{2} 至 [0-9]{4}-[0-9]{2}-[0-9]{2}")
+        let oldPeriod = app.staticTexts.matching(predicate).firstMatch.label
         tapSettings(app)
         app.buttons["每期从哪天开始"].tap()
-        app.pickerWheels.firstMatch.adjust(toPickerWheelValue: "每月 1 日")
-        if app.buttons["保存周期设置"].isEnabled {
-            app.buttons["保存周期设置"].tap()
-            app.alerts.buttons["确认修改"].tap()
-        } else { app.buttons["返回设置"].tap() }
+        let wheel = app.pickerWheels.firstMatch
+        let target = (wheel.value as? String) == "每月 1 日" ? "每月 22 日" : "每月 1 日"
+        wheel.adjust(toPickerWheelValue: target)
+        XCTAssertTrue(app.staticTexts["以上为下一期的过渡日期。"].exists)
+        app.buttons["保存周期设置"].tap(); app.alerts.buttons["确认修改"].tap()
         app.buttons["周期"].tap()
-        let period = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "[0-9]{4}-[0-9]{2}-01 至 [0-9]{4}-[0-9]{2}-[0-9]{2}")).firstMatch
-        XCTAssertTrue(period.waitForExistence(timeout: 5))
-        app.terminate(); app.launch(); app.buttons["周期"].tap()
-        XCTAssertTrue(period.waitForExistence(timeout: 5))
-        app.buttons["下一期"].tap()
-        tapSettings(app)
-        app.buttons["调整每类能花多少钱"].tap()
-        XCTAssertEqual(app.textFields["budget.餐饮"].value as? String, "不设预算")
-        app.buttons["返回设置"].tap()
-        app.buttons["每期从哪天开始"].tap()
-        app.pickerWheels.firstMatch.adjust(toPickerWheelValue: "每月 22 日")
-        app.buttons["保存周期设置"].tap()
-        app.alerts.buttons["确认修改"].tap()
+        XCTAssertEqual(app.staticTexts.matching(predicate).firstMatch.label, oldPeriod)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts.matching(predicate).firstMatch.label, oldPeriod)
+        tapSettings(app); app.buttons["每期从哪天开始"].tap()
+        XCTAssertEqual(app.pickerWheels.firstMatch.value as? String, target)
     }
+    @MainActor func testUnsavedBudgetGuardAndDraft() throws {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        tapSettings(app); app.buttons["调整每类能花多少钱"].tap()
+        let field = app.textFields["budget.餐饮"]
+        let value = String(Int.random(in: 38...999)) + ".25"
+        field.tap(); field.typeText(value); app.swipeUp()
+        app.buttons["返回设置"].tap()
+        XCTAssertTrue(app.buttons["继续编辑"].waitForExistence(timeout: 5))
+        app.buttons["继续编辑"].tap()
+        XCTAssertEqual(field.value as? String, value)
+        XCTAssertFalse(app.keyboards.firstMatch.exists)
+        // A dirty budget is modal: the tab bar cannot bypass its save decision.
+        app.swipeDown()
+        XCTAssertTrue(app.buttons["返回设置"].exists)
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        tapSettings(app); app.buttons["调整每类能花多少钱"].tap()
+        XCTAssertEqual(field.value as? String, value)
+        app.buttons["下一期"].tap()
+        XCTAssertTrue(app.buttons["保存并继续"].waitForExistence(timeout: 5))
+        app.buttons["保存并继续"].tap()
+        app.buttons["上一期"].tap()
+        XCTAssertEqual(field.value as? String, value)
+        app.buttons["返回设置"].tap()
+        XCTAssertTrue(app.buttons["调整每类能花多少钱"].waitForExistence(timeout: 5))
+    }
+    @MainActor func testPartialRefundAndCorrection() throws {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        app.buttons["记账"].tap(); app.buttons["手动记一笔"].tap()
+        let merchant = "Fictional Refund " + String(UUID().uuidString.prefix(6))
+        let amount = app.textFields["金额（USD，例如 12.50）"]
+        amount.tap(); amount.typeText("25")
+        app.textFields["商家"].tap(); app.textFields["商家"].typeText(merchant)
+        app.swipeUp(); app.buttons["确认并保存"].tap()
+        XCTAssertTrue(app.alerts["已保存"].waitForExistence(timeout: 5)); app.alerts.buttons["完成"].tap()
+        app.staticTexts[merchant].tap()
+        for _ in 0..<6 { if app.buttons["记录退款"].isHittable { break }; app.swipeUp() }
+        app.buttons["记录退款"].tap()
+        let refund = app.textFields["refund.amount"]
+        XCTAssertTrue(refund.waitForExistence(timeout: 5)); refund.tap(); refund.typeText("5")
+        app.buttons["确认并保存"].tap(); app.alerts.buttons["保存退款"].tap()
+        XCTAssertTrue(app.staticTexts["US$20.00"].waitForExistence(timeout: 5))
+        app.buttons["返回账目"].tap()
+        XCTAssertTrue(app.buttons["手动记一笔"].waitForExistence(timeout: 5))
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        app.buttons["记账"].tap(); app.staticTexts[merchant].tap()
+        for _ in 0..<6 { if app.buttons["作废退款"].isHittable { break }; app.swipeUp() }
+        app.buttons["作废退款"].tap(); app.alerts.buttons["作废退款"].tap()
+        XCTAssertTrue(app.staticTexts["US$25.00"].waitForExistence(timeout: 5))
+    }
+
 }
 
 extension LocalLedgerUITests {

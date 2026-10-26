@@ -18,8 +18,8 @@ enum L10n {
     }
     static func cents(_ input: String) -> Int? { Money.inputCents(input, decimalComma: language == "fr") }
     static func merchant(_ value: String) -> String { MerchantDisplay.name(value) }
-    static func period(_ key: String, startDay: Int) -> String {
-        let label = LedgerDate.cycleLabel(key, startDay: startDay)
+    static func period(_ key: String, settings: BudgetSettings) -> String {
+        let label = settings.cycleLabel(key)
         return language == "zh-Hans" ? label : label.replacingOccurrences(of: " 至 ", with: " – ")
     }
 }
