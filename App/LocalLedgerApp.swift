@@ -7,14 +7,21 @@ import SwiftUI
     @State private var opening = true
     var body: some Scene {
         WindowGroup {
-            RootView().environmentObject(store)
+            ZStack {
+                LedgerStyle.canvas.ignoresSafeArea()
+                RootView().environmentObject(store)
+                    .opacity(opening ? 0 : 1)
+                    .allowsHitTesting(!opening)
+                    .accessibilityHidden(opening)
+                if opening && scenePhase == .active {
+                    LedgerCover(animated: true) {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.4)) { opening = false }
+                    }.transition(.opacity).accessibilityIdentifier("opening.cover")
+                }
+            }
                 .overlay {
                     if scenePhase != .active {
                         LedgerCover().accessibilityIdentifier("privacy.cover")
-                    } else if opening {
-                        LedgerCover(animated: true) {
-                            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { opening = false }
-                        }.transition(.opacity).accessibilityIdentifier("opening.cover")
                     }
                 }
                 .alert("提示", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
