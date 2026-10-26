@@ -85,8 +85,8 @@ struct DashboardView: View {
                 }.padding(.horizontal, 28).padding(.bottom, 12).frame(maxWidth: 560)
                     .frame(maxWidth: .infinity)
             }.background(LedgerStyle.canvas).toolbar(.hidden, for: .navigationBar)
-                .sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) } }
-                .sheet(item: $draft) { EntryEditor(draft: $0, ledger: store.ledger) }
+                .sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) }.privacyProtected() }
+                .sheet(item: $draft) { EntryEditor(draft: $0, ledger: store.ledger).privacyProtected() }
         }
     }
     private var summary: some View {
@@ -155,6 +155,6 @@ struct BudgetDetails: View {
             MonthSelector(date: $date)
             ForEach(store.ledger.visibleCategories(), id: \.self) { BudgetRow(category: $0, month: LedgerDate.month(date)) }
             Button("调整分类预算") { showBudget = true }
-        }.listStyle(.plain).ledgerCanvas().safeAreaInset(edge: .top) { Button("返回") { dismiss() }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("预算与剩余").sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) } }
+        }.listStyle(.plain).ledgerCanvas().safeAreaInset(edge: .top) { Button("返回") { dismiss() }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("预算与剩余").sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) }.privacyProtected() }
     }
 }

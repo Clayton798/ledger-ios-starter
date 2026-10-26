@@ -39,9 +39,18 @@ public enum Money {
 
 public enum LedgerDate {
     public static func valid(_ string: String) -> Bool {
-        guard string.range(of: #"^20[0-9]{2}-[0-9]{2}-[0-9]{2}$|^2100-[0-9]{2}-[0-9]{2}$"#, options: .regularExpression) != nil else { return false }
-        let f = formatter(); f.isLenient = false
-        return f.date(from: string).map { f.string(from: $0) == string } ?? false
+        let bytes = Array(string.utf8)
+        guard bytes.count == 10, bytes[4] == 45, bytes[7] == 45,
+              [0,1,2,3,5,6,8,9].allSatisfy({ (48...57).contains(bytes[$0]) }) else { return false }
+        let year = Int(bytes[0]-48)*1000 + Int(bytes[1]-48)*100 + Int(bytes[2]-48)*10 + Int(bytes[3]-48)
+        let month = Int(bytes[5]-48)*10 + Int(bytes[6]-48)
+        let day = Int(bytes[8]-48)*10 + Int(bytes[9]-48)
+        return (2000...2100).contains(year) && (1...12).contains(month) && day > 0 && day <= daysInMonth(year: year, month: month)
+    }
+    static func daysInMonth(year: Int, month: Int) -> Int {
+        guard (1...12).contains(month) else { return 0 }
+        if month == 2 { return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) ? 29 : 28 }
+        return [4,6,9,11].contains(month) ? 30 : 31
     }
     public static func formatter() -> DateFormatter {
         let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX")
@@ -56,7 +65,7 @@ public enum LedgerDate {
             ? cycleKey(for: currentDay, startDay: startDay) : selected
     }
     public static func month(_ date: Date) -> String { String(string(date).prefix(7)) }
-    public static func validMonth(_ value: String) -> Bool { valid(value + "-01") }
+    public static func validMonth(_ value: String) -> Bool { valid(value + "-01") || value == "1999-12" || value == "2101-01" }
 }
 
 public enum Categories {
@@ -217,7 +226,7 @@ public struct Ledger: Codable, Equatable, Sendable {
         try next.validate(); self = next
     }
     public func merging(_ imported: Ledger) throws -> Ledger {
-        try imported.validate(); var result = self
+        try validate(); try imported.validate(); var result = self
         var byID = Dictionary(uniqueKeysWithValues: entries.map { ($0.id, $0) })
         for entry in imported.entries {
             if let existing = byID[entry.id] {
@@ -237,9 +246,8 @@ public struct Ledger: Codable, Equatable, Sendable {
 
 extension LedgerDate {
     public static func cycleStart(_ key: String, startDay: Int = 22) -> String {
-        guard validMonth(key), (1...31).contains(startDay), let first = formatter().date(from: key + "-01"),
-              let days = Calendar(identifier: .gregorian).range(of: .day, in: .month, for: first) else { return "" }
-        return key + String(format: "-%02d", min(startDay, days.count))
+        guard validMonth(key), (1...31).contains(startDay), let year = Int(key.prefix(4)), let month = Int(key.suffix(2)) else { return "" }
+        return key + String(format: "-%02d", min(startDay, daysInMonth(year: year, month: month)))
     }
     public static func cycleKey(for day: String, startDay: Int = 22) -> String {
         guard valid(day), (1...31).contains(startDay) else { return "" }
@@ -310,8 +318,9 @@ public enum MerchantDisplay {
 
 extension LedgerDate {
     public static func shiftMonth(_ key: String, by offset: Int) -> String {
-        guard let date = formatter().date(from: key + "-01"), let next = Calendar(identifier: .gregorian).date(byAdding: .month, value: offset, to: date) else { return "" }
-        return month(next)
+        guard validMonth(key), let year = Int(key.prefix(4)), let month = Int(key.suffix(2)), (-1200...1200).contains(offset) else { return "" }
+        let index = year * 12 + month - 1 + offset
+        return String(format: "%04d-%02d", index / 12, index % 12 + 1)
     }
 }
 extension BudgetSettings {

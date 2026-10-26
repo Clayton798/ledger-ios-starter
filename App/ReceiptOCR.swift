@@ -11,24 +11,19 @@ enum ReceiptOCR {
     }
     static func recognizeLines(_ data: Data) async throws -> [OCRLine] {
         try await Task.detached(priority: .userInitiated) {
-            guard let image = UIImage(data: data), let cg = image.cgImage else { throw OCRFailure() }
+            // Bound decoded pixels before Vision to avoid exhausting memory on large photos.
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 4096,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceShouldCacheImmediately: true
+                  ] as CFDictionary) else { throw OCRFailure() }
             let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
             request.recognitionLanguages = ["zh-Hans", "en-US"]
             request.usesLanguageCorrection = true
-            let orientation: CGImagePropertyOrientation
-            switch image.imageOrientation {
-            case .up: orientation = .up
-            case .down: orientation = .down
-            case .left: orientation = .left
-            case .right: orientation = .right
-            case .upMirrored: orientation = .upMirrored
-            case .downMirrored: orientation = .downMirrored
-            case .leftMirrored: orientation = .leftMirrored
-            case .rightMirrored: orientation = .rightMirrored
-            @unknown default: orientation = .up
-            }
-            try VNImageRequestHandler(cgImage: cg, orientation: orientation).perform([request])
+            try VNImageRequestHandler(cgImage: cg, orientation: .up).perform([request])
             let lines = (request.results ?? []).compactMap { observation -> OCRLine? in
                 guard let text = observation.topCandidates(1).first?.string else { return nil }
                 let box = observation.boundingBox

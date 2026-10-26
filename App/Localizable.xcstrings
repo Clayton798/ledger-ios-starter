@@ -6432,6 +6432,52 @@
           }
         }
       }
+    },
+    "检测到入账、还款或退款，不能记作新消费。退款请在原消费中记录。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检测到入账、还款或退款，不能记作新消费。退款请在原消费中记录。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This appears to be income, a card payment or a refund, not a new purchase. Record refunds against the original purchase."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il semble s’agir d’un revenu, d’un paiement de carte ou d’un remboursement, et non d’un nouvel achat. Associez les remboursements à l’achat initial."
+          }
+        }
+      }
+    },
+    "周期起始日可在设置中修改。预算每期单独填写，支持美元消费及关联退款。": {
+      "extractionState": "manual",
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "周期起始日可在设置中修改。预算每期单独填写，支持美元消费及关联退款。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change the period start day in Settings. Set a budget for each period. Record USD purchases and linked refunds."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifiez le début de période dans Réglages. Définissez un budget par période. Enregistrez les achats en USD et leurs remboursements."
+          }
+        }
+      }
     }
   },
   "version": "1.0"

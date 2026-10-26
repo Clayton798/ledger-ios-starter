@@ -97,7 +97,7 @@ struct EntryEditor: View {
                     }
                 }
             }.ledgerCanvas().scrollDismissesKeyboard(.interactively).navigationTitle(draft.entry == nil ? "核对并保存" : "编辑记录")
-                .sheet(isPresented: $showRefund) { if let current = currentEntry { RefundEditor(entryID: current.id) } }
+                .sheet(isPresented: $showRefund) { if let current = currentEntry { RefundEditor(entryID: current.id).privacyProtected() } }
                 .alert("作废这笔退款？", isPresented: Binding(get: { refundToVoid != nil }, set: { if !$0 { refundToVoid = nil } })) {
                     Button("取消", role: .cancel) { refundToVoid = nil }
                     Button("作废退款", role: .destructive) {

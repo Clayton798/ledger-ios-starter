@@ -35,6 +35,8 @@ import SwiftUI
                 .alert("提示", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
                     Button("知道了", role: .cancel) { store.error = nil }
                 } message: { Text(L10n.text(store.error ?? "")) }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.protectedDataDidBecomeAvailableNotification)) { _ in store.reloadIfNeeded() }
+                .onChange(of: scenePhase) { _, phase in if phase == .active { store.reloadIfNeeded() } }
                 .environment(\.locale, Locale(identifier: language))
         }
     }

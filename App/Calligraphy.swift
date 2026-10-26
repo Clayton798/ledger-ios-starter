@@ -31,8 +31,8 @@ struct LedgerInkStroke: Shape {
     }
 }
 struct HandwrittenLedger: View, Animatable {
-    var progress: CGFloat = 1
-    var animatableData: CGFloat { get { progress } set { progress = newValue } }
+    nonisolated var progress: CGFloat = 1
+    nonisolated var animatableData: CGFloat { get { progress } set { progress = newValue } }
     var body: some View {
         ZStack {
             ForEach(0..<LedgerInk.strokes.count, id: \.self) { i in

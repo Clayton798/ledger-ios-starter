@@ -110,7 +110,7 @@ struct QuickStartView: View {
                         step("3", "看看花在哪，再做备份", "在“周期”查看花费，在“设置”保存账本副本，换机时再找回。")
                     }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
                         .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
-                    Label("周期起始日可在设置中修改。预算每期单独填写，仅支持美元正向支出。", systemImage: "calendar")
+                    Label("周期起始日可在设置中修改。预算每期单独填写，支持美元消费及关联退款。", systemImage: "calendar")
                         .font(.footnote).foregroundStyle(.secondary)
                     NavigationLink { BudgetEditor() } label: {
                         Label("先设置我的预算", systemImage: "slider.horizontal.3").frame(maxWidth: .infinity)
@@ -152,4 +152,21 @@ struct EditorialAction: View {
         }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 18).contentShape(Rectangle())
             .accessibilityElement(children: .ignore).accessibilityLabel(title).accessibilityHint(detail)
     }
+}
+
+// A root overlay cannot cover a presented sheet. Protect each modal surface too.
+private struct LedgerPrivacyProtection: ViewModifier {
+    @Environment(\.scenePhase) private var scenePhase
+    func body(content: Content) -> some View {
+        content
+            .accessibilityHidden(scenePhase != .active)
+            .overlay {
+                if scenePhase != .active {
+                    LedgerCover().ignoresSafeArea().accessibilityIdentifier("privacy.modalCover")
+                }
+            }
+    }
+}
+extension View {
+    func privacyProtected() -> some View { modifier(LedgerPrivacyProtection()) }
 }

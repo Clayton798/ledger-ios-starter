@@ -76,6 +76,9 @@ public enum StatementParser {
             // rejects importing the same image row again, including partial imports.
             let fingerprint = "statement-" + ReceiptParser.fingerprint(text) + "-" + String(index)
             rows.append(StatementRow(id: String(index), text: line, merchant: String(merchant.prefix(100)), amount: amount, date: parsed.dates.count == 1 ? parsed.dates[0] : contextDate, explicitUSD: global.explicitUSD && !currencyBlocked, blockedReason: reason, fingerprint: fingerprint))
+            // A date on an individual transaction ends an older heading context.
+            // Do not assign that old heading to the next transaction.
+            if !parsed.dates.isEmpty { contextDate = "" }
             previous = ""
         }
         return StatementResult(rows: rows, text: text, notice: "按图片中的金额行拆分，可能漏行或错配商家。请对照原图核对笔数、日期、金额和收支方向；总额与余额不入账。只支持正向 USD 消费，不能自动换汇。")

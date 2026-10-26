@@ -11,6 +11,11 @@ import UniformTypeIdentifiers
     init() {
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("LocalLedger", isDirectory: true)
         disk = LedgerDisk(url: directory.appendingPathComponent("ledger.json"))
+        reloadIfNeeded()
+    }
+    func reloadIfNeeded() {
+        guard !ready else { return }
+        let directory = disk.url.deletingLastPathComponent()
         do {
             let original = try disk.load()
             let migrated = try original.usingIndependentBudgets(on: LedgerDate.string(Date()))
@@ -18,7 +23,7 @@ import UniformTypeIdentifiers
                 try LedgerDisk(url: directory.appendingPathComponent("before-cycle-upgrade.json")).save(original)
                 try disk.save(migrated)
             }
-            ledger = migrated; ready = true
+            ledger = migrated; ready = true; error = nil
         } catch { self.error = "无法读取账本，已停止写入保护数据：\(error.localizedDescription)" }
     }
     func commit(_ next: Ledger) throws {
@@ -43,6 +48,10 @@ import UniformTypeIdentifiers
         let previous = disk.url.deletingLastPathComponent().appendingPathComponent("before-restore.json")
         try LedgerDisk(url: previous).save(ledger)
         try commit(merged)
+        // Drafts refer to the budget snapshot that existed before restoring.
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("budgetDraft.") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 }
 

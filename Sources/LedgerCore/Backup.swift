@@ -47,8 +47,22 @@ public struct LedgerDisk {
     public let url: URL
     public init(url: URL) { self.url = url }
     public func load() throws -> Ledger {
-        if !FileManager.default.fileExists(atPath: url.path) { return Ledger() }
-        let ledger = try Backup.decode(Data(contentsOf: url))
+        let data: Data
+        do {
+            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            guard size <= Backup.maximumBytes else { throw LedgerError.invalid("备份超过 25 MB，请分开整理。") }
+            data = try Data(contentsOf: url)
+        } catch {
+            let failure = error as NSError
+            let underlying = failure.userInfo[NSUnderlyingErrorKey] as? NSError
+            // fileExists is also false for protected/inaccessible files. Only ENOENT
+            // (a genuinely absent path) is a new ledger, never EACCES or ENOTDIR.
+            if (failure.domain == NSPOSIXErrorDomain && failure.code == Int(ENOENT)) ||
+                (failure.domain == NSCocoaErrorDomain && failure.code == NSFileReadNoSuchFileError &&
+                 (underlying == nil || (underlying?.domain == NSPOSIXErrorDomain && underlying?.code == Int(ENOENT)))) { return Ledger() }
+            throw error
+        }
+        let ledger = try Backup.decode(data)
         #if os(iOS)
         var folder = url.deletingLastPathComponent()
         var values = URLResourceValues(); values.isExcludedFromBackup = true

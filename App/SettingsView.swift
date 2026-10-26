@@ -73,8 +73,8 @@ struct SettingsView: View {
                 }.buttonStyle(.plain).padding(.horizontal, 28).padding(.bottom, 30)
                     .frame(maxWidth: 560).frame(maxWidth: .infinity)
             }.background(LedgerStyle.canvas)
-                .sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) } }
-                .sheet(isPresented: $showGuide) { QuickStartView() }
+                .sheet(isPresented: $showBudget) { NavigationStack { BudgetEditor(initialDate: date) }.privacyProtected() }
+                .sheet(isPresented: $showGuide) { QuickStartView().privacyProtected() }
                 .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
                     do {
                         let url = try result.get(); let access = url.startAccessingSecurityScopedResource()
@@ -175,8 +175,13 @@ struct BudgetEditor: View {
                 guard let field = notification.object as? UITextField else { return }
                 DispatchQueue.main.async { field.selectAll(nil) }
             }
-            .safeAreaInset(edge: .bottom) { Button("保存预算") { save() }.buttonStyle(.borderedProminent).padding().frame(maxWidth: .infinity).background(.regularMaterial) }
-            .safeAreaInset(edge: .top) { Button("返回设置") { activeField = nil; if dirty { leaving = true; confirmLeave = true } else { dismiss() } }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 8).background(LedgerStyle.canvas) }.navigationTitle("本期分类预算").navigationBarBackButtonHidden(true).onAppear {
+            .safeAreaInset(edge: .top) {
+                HStack {
+                    Button("返回设置") { activeField = nil; if dirty { leaving = true; confirmLeave = true } else { dismiss() } }
+                    Spacer()
+                    Button("保存预算") { activeField = nil; save() }
+                }.frame(minHeight: 44).padding(.horizontal, 24).background(LedgerStyle.canvas)
+            }.navigationTitle("本期分类预算").navigationBarBackButtonHidden(true).onAppear {
                 if !initialized { date = initialDate ?? store.ledger.settings.selection(Date()); load(); initialized = true }
             }
             .interactiveDismissDisabled(dirty)

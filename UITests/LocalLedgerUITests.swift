@@ -2,6 +2,22 @@ import XCTest
 import UIKit
 
 final class LocalLedgerUITests: XCTestCase {
+    @MainActor func testEditorSurvivesBackgroundWithoutReplayingOpening() throws {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 8))
+        app.buttons["手动记一笔"].tap()
+        let amount = app.textFields["金额（USD，例如 12.50）"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        amount.tap(); amount.typeText("17.25")
+        XCUIDevice.shared.press(.home)
+        app.activate()
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertEqual(amount.value as? String, "17.25")
+        XCTAssertFalse(app.otherElements["opening.cover"].exists)
+        XCTAssertFalse(app.otherElements["privacy.modalCover"].exists)
+        app.buttons["关闭"].tap()
+    }
+
     @MainActor func testBundledEditorialFont() throws {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 8))
@@ -13,11 +29,11 @@ final class LocalLedgerUITests: XCTestCase {
 
     @MainActor func testSharedCycleAndLaunch() throws {
         let app = XCUIApplication(); app.launch()
-        XCTAssertTrue(app.buttons["周期"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 8))
         XCTAssertFalse(app.staticTexts["本地账本"].exists)
         app.buttons["周期"].tap()
         app.buttons["上一期"].tap()
-        let period = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "[0-9]{4}-[0-9]{2}-22 至 [0-9]{4}-[0-9]{2}-21")).firstMatch
+        let period = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "[0-9]{4}-[0-9]{2}-[0-9]{2} 至 [0-9]{4}-[0-9]{2}-[0-9]{2}")).firstMatch
         XCTAssertTrue(period.exists)
         let selected = period.label
         app.buttons["分析"].tap()
@@ -36,7 +52,9 @@ final class LocalLedgerUITests: XCTestCase {
     @MainActor func testSimpleSettingsAndLegacyChart() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-spendingChartStyle", "饼图"]
-        app.launch(); app.buttons["分析"].tap()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        app.buttons["分析"].tap()
         XCTAssertFalse(app.buttons["饼图"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["spending.categories"].firstMatch.waitForExistence(timeout: 5))
         tapSettings(app)
@@ -153,7 +171,8 @@ final class LocalLedgerUITests: XCTestCase {
     }
 
     @MainActor func testMerchantCategoryMemory() throws {
-        let app = XCUIApplication(); app.launch(); app.buttons["记账"].tap()
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
         let merchant = "Memory Store " + String(UUID().uuidString.prefix(6))
         app.buttons["手动记一笔"].tap()
         let amount = app.textFields["金额（USD，例如 12.50）"]
@@ -162,7 +181,9 @@ final class LocalLedgerUITests: XCTestCase {
         app.buttons["entry.category"].tap(); app.buttons["超市日用"].tap()
         app.swipeUp(); app.buttons["确认并保存"].tap()
         XCTAssertTrue(app.alerts["已保存"].waitForExistence(timeout: 5)); app.alerts.buttons["完成"].tap()
-        app.terminate(); app.launch(); app.buttons["记账"].tap(); app.buttons["手动记一笔"].tap()
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        app.buttons["手动记一笔"].tap()
         app.textFields["商家"].tap(); app.textFields["商家"].typeText(merchant)
         XCTAssertEqual(app.buttons["entry.category"].value as? String, "超市日用")
         let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "自动记住商家分类"; shot.lifetime = .keepAlways; add(shot)
@@ -170,7 +191,7 @@ final class LocalLedgerUITests: XCTestCase {
     }
 
     @MainActor func testStudentBudgetSettings() throws {
-        let app = XCUIApplication(); app.launch(); XCTAssertTrue(app.buttons["设置"].waitForExistence(timeout: 8)); tapSettings(app)
+        let app = XCUIApplication(); app.launch(); XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10)); tapSettings(app)
         app.buttons["调整每类能花多少钱"].tap()
         XCTAssertTrue(app.buttons["返回设置"].waitForExistence(timeout: 5))
         let laundry = app.textFields["budget.餐饮"]

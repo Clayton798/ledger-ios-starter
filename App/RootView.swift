@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import Charts
 import PhotosUI
 import UIKit
@@ -44,7 +45,7 @@ struct RootView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in refreshClock() }
             .onChange(of: scenePhase) { _, phase in if phase == .active { refreshClock() } }
             .sheet(isPresented: $showWelcome, onDismiss: { welcomeCompleted = true }) {
-                QuickStartView { welcomeCompleted = true }
+                QuickStartView { welcomeCompleted = true }.privacyProtected()
             }
     }
     private func refreshClock() {
@@ -155,8 +156,8 @@ struct EntriesView: View {
                 }.buttonStyle(.plain).padding(.horizontal, 28).padding(.bottom, 30)
                     .frame(maxWidth: 560).frame(maxWidth: .infinity)
             }.background(LedgerStyle.canvas).scrollDismissesKeyboard(.interactively).toolbar(.hidden, for: .navigationBar)
-                .sheet(item: $draft) { EntryEditor(draft: $0, ledger: store.ledger) }
-                .sheet(item: $statement) { StatementEditor(result: $0, ledger: store.ledger) }
+                .sheet(item: $draft) { EntryEditor(draft: $0, ledger: store.ledger).privacyProtected() }
+                .sheet(item: $statement) { StatementEditor(result: $0, ledger: store.ledger).privacyProtected() }
                 .onChange(of: statementItem) { _, selected in
                     guard let selected else { return }; busy = true
                     Task {
@@ -164,7 +165,7 @@ struct EntriesView: View {
                         do {
                             guard let data = try await selected.loadTransferable(type: Data.self), data.count <= 30 * 1024 * 1024 else { throw OCRFailure() }
                             let lines = try await ReceiptOCR.recognizeLines(data)
-                            statement = StatementParser.parse(lines)
+                            statement = await Task.detached(priority: .userInitiated) { StatementParser.parse(lines) }.value
                         } catch { store.error = error.localizedDescription }
                     }
                 }
@@ -176,7 +177,8 @@ struct EntriesView: View {
                         do {
                             guard let data = try await selected.loadTransferable(type: Data.self), data.count <= 30 * 1024 * 1024 else { throw OCRFailure() }
                             let text = try await ReceiptOCR.recognize(data)
-                            draft = Draft(receipt: ReceiptParser.parse(text), text: text)
+                            let receipt = await Task.detached(priority: .userInitiated) { ReceiptParser.parse(text) }.value
+                            draft = Draft(receipt: receipt, text: text)
                         } catch { store.error = error.localizedDescription }
                     }
                 }
