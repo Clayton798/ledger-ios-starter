@@ -64,11 +64,17 @@ struct MonthSelector: View {
     @EnvironmentObject private var store: LedgerStore
     @Binding var date: Date
     var body: some View {
+        VStack(spacing: 2) {
         HStack {
             Button { move(-1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }.accessibilityLabel("上一期")
             Spacer(); Text(L10n.period(LedgerDate.month(date), settings: store.ledger.settings)).font(.caption).monospacedDigit(); Spacer()
             Button { move(1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }.accessibilityLabel("下一期")
         }.buttonStyle(.borderless)
+        if LedgerDate.month(date) != store.ledger.settings.cycleKey(for: store.today) {
+            Button("回到本期") { date = store.ledger.settings.selection(Date()) }
+                .font(.caption).frame(minHeight: 36).accessibilityIdentifier("period.current")
+        }
+        }
     }
     func move(_ delta: Int) {
         let calendar = Calendar(identifier: .gregorian)
@@ -107,6 +113,7 @@ struct EntriesView: View {
     @State private var busy = false
     @State private var showVoided = false
     @State private var search = ""
+    @State private var allPeriods = false
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -127,7 +134,8 @@ struct EntriesView: View {
                     Divider()
                     if busy { ProgressView("正在设备上识别…").padding(.vertical, 12) }
                     EditorialSectionTitle(title: "本期记录", index: "01").padding(.top, 32)
-                    MonthSelector(date: $date).padding(.vertical, 10)
+                    if !allPeriods { MonthSelector(date: $date).padding(.vertical, 10) }
+                    if allPeriods { Text("正在查找所有周期的记录").font(.caption).foregroundStyle(.secondary).padding(.vertical, 10) }
                     HStack(spacing: 10) {
                         Image(systemName: "magnifyingglass").font(.footnote).foregroundStyle(.secondary)
                         TextField("搜索商家、分类或备注", text: $search).font(.subheadline)
@@ -136,7 +144,19 @@ struct EntriesView: View {
                     }.padding(.vertical, 12)
                     Divider()
                     Toggle("显示已作废", isOn: $showVoided).font(.caption).tint(LedgerStyle.accent).padding(.vertical, 14)
-                    let rows = store.ledger.entries.filter { store.ledger.settings.inCycle($0.date, key: LedgerDate.month(date)) && (showVoided || $0.voidedAt == nil) && (search.isEmpty || ($0.merchant + " " + L10n.merchant($0.merchant) + " " + ($0.note ?? "") + " " + Categories.title($0.category) + " " + L10n.text(Categories.title($0.category))).localizedCaseInsensitiveContains(search)) }.sorted { $0.date == $1.date ? $0.createdAt > $1.createdAt : $0.date > $1.date }
+                    Picker("查找范围", selection: $allPeriods) {
+                        Text("当前周期").tag(false)
+                        Text("全部周期").tag(true)
+                    }.pickerStyle(.segmented).accessibilityIdentifier("entries.scope").padding(.bottom, 12)
+                    let rows = store.ledger.matchingEntries(cycle: allPeriods ? nil : LedgerDate.month(date), query: search, includeVoided: showVoided) {
+                        L10n.merchant($0.merchant) + " " + L10n.text(Categories.title($0.category))
+                    }
+                    HStack {
+                        Text(L10n.format("%d 笔记录", rows.count))
+                        Spacer()
+                        Text(L10n.format("净支出 %@", Money.display(Ledger.netTotal(of: rows))))
+                    }.font(.caption).foregroundStyle(.secondary).padding(.bottom, 12).accessibilityIdentifier("entries.summary")
+                    if showVoided { Text("合计已扣退款，不包含作废记录。").font(.caption).foregroundStyle(.secondary).padding(.bottom, 12) }
                     if rows.isEmpty { ContentUnavailableView(LocalizedStringKey(search.isEmpty ? "从第一笔开始" : "没有找到匹配记录"), systemImage: search.isEmpty ? "square.and.pencil" : "magnifyingglass", description: Text(L10n.text(search.isEmpty ? "选择付款截图，或手动记录今天的消费。" : "试试其他商家、分类或备注关键词。"))) }
                     ForEach(rows) { entry in
                         Button { draft = Draft(entry: entry) } label: {

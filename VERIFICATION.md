@@ -4,7 +4,7 @@ This is a record of tested behavior, not a guarantee that every possible bug has
 
 ## Core
 
-62 Swift tests pass. Coverage includes integer-cent calculations, backup validation and round trips, restore conflicts, duplicate detection, independent period budgets, period start days and short months, date boundaries, New York midnight and daylight saving transitions, timezone differences, unknown screenshot dates, Chinese bank-message extraction, merchant aliases, and French manual decimal input.
+63 Swift tests pass. Coverage includes integer-cent calculations, backup validation and round trips, restore conflicts, duplicate detection, independent period budgets, period start days and short months, date boundaries, New York midnight and daylight saving transitions, timezone differences, unknown screenshot dates, Chinese bank-message extraction, merchant aliases, and French manual decimal input.
 
 ## Interface checks
 
@@ -45,3 +45,11 @@ Additional hardening bounds decoded OCR images to 4096 pixels on the longest sid
 All six new core regression cases pass alongside the existing suite (62 core tests). Across the full run and targeted reruns, all 17 runnable interface cases passed. Two photo-picker fixtures were explicitly skipped because they require a separately seeded image library; they were not counted as passing. Initial failures exposed two startup-timing assumptions in automation and a real budget-save hit-target issue with the keyboard visible. The selectors now wait for the ready overview, and budget saving lives in the fixed top bar, clears keyboard focus, and was verified by saving and reopening the value. Unsaved-budget guard and draft recovery were rerun after that layout change.
 
 The final signed build was installed and launched on the connected iPhone. A fresh device ledger snapshot before and after the update compared equal in its entirety, including records and settings. These private snapshots remain outside the repository.
+
+## Search usability follow-up
+
+Added current/all-period search, matching record count and net spending, and a return-to-current-period action. Search supports multiple words, merchant names, translated categories, notes, ISO dates and original/net amounts. Voided entries may be displayed but never contribute to the result total; refunds reduce the original purchase’s amount. The scope does not modify stored dates or budgets.
+
+63 core tests pass. Three focused interface tests passed for cross-period scope and return-to-current, the existing search/guide flow, and shared period navigation/background return. The signed build was installed and launched, and the complete before/after device ledger snapshots matched. No private snapshots are in this repository.
+
+Design references: [Actual transaction filtering](https://actualbudget.org/docs/transactions/filters/) and [YNAB search, sorting and filtering](https://support.ynab.com/en_us/searching-transactions-a-guide-r1gxyQryj?mobile-help=true). These informed the local search workflow; no service integration was added.

@@ -18,6 +18,22 @@ final class LocalLedgerUITests: XCTestCase {
         app.buttons["关闭"].tap()
     }
 
+    @MainActor func testAllPeriodSearchAndReturnToCurrent() throws {
+        let app = XCUIApplication(); app.launch()
+        XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 10))
+        app.buttons["上一期"].tap()
+        XCTAssertTrue(app.buttons["period.current"].waitForExistence(timeout: 5))
+        app.buttons["period.current"].tap()
+        XCTAssertFalse(app.buttons["period.current"].exists)
+        app.buttons["记账"].tap()
+        for _ in 0..<4 { if app.buttons["全部周期"].isHittable { break }; app.swipeUp() }
+        app.buttons["全部周期"].tap()
+        XCTAssertTrue(app.staticTexts["正在查找所有周期的记录"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["entries.summary"].firstMatch.exists)
+        app.buttons["当前周期"].tap()
+        XCTAssertFalse(app.staticTexts["正在查找所有周期的记录"].exists)
+    }
+
     @MainActor func testBundledEditorialFont() throws {
         let app = XCUIApplication(); app.launch()
         XCTAssertTrue(app.staticTexts["overview.spent"].waitForExistence(timeout: 8))

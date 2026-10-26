@@ -359,3 +359,26 @@ extension Ledger {
         try upsert(entry)
     }
 }
+
+extension Ledger {
+    /// A nil cycle searches the complete ledger. Voided rows never contribute to totals.
+    public func matchingEntries(cycle: String?, query: String, includeVoided: Bool = false,
+                                displayText: (Entry) -> String = { _ in "" }) -> [Entry] {
+        let words = query.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        return entries.filter { entry in
+            guard (cycle == nil || settings.inCycle(entry.date, key: cycle!)),
+                  includeVoided || entry.voidedAt == nil else { return false }
+            let text = [entry.merchant, MerchantDisplay.name(entry.merchant), entry.note ?? "",
+                        Categories.title(entry.category), entry.date, Money.decimal(entry.amount),
+                        Money.decimal(entry.netAmount), displayText(entry)].joined(separator: " ")
+            return words.allSatisfy { text.localizedCaseInsensitiveContains($0) }
+        }.sorted {
+            if $0.date != $1.date { return $0.date > $1.date }
+            if $0.createdAt != $1.createdAt { return $0.createdAt > $1.createdAt }
+            return $0.id < $1.id
+        }
+    }
+    public static func netTotal(of entries: [Entry]) -> Int {
+        entries.filter { $0.voidedAt == nil }.reduce(0) { $0 + $1.netAmount }
+    }
+}

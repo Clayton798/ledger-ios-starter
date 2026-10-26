@@ -2,6 +2,22 @@ import XCTest
 @testable import LedgerCore
 
 final class AuditRegressionTests: XCTestCase {
+    func testSearchAcrossPeriodsAndRefundNetTotal() {
+        var ledger = Ledger()
+        var old = Entry(amount: 2000, merchant: "Example Market", date: "2026-09-24", category: "居家")
+        old.refunds = [Refund(amount: 500, date: "2026-10-01")]
+        let current = Entry(amount: 1000, merchant: "Example Market", date: "2026-10-25", category: "居家")
+        var voided = Entry(amount: 900, merchant: "Example Market", date: "2026-10-26", category: "居家")
+        voided.voidedAt = "2026-10-26"
+        ledger.entries = [old, current, voided]
+        XCTAssertEqual(ledger.matchingEntries(cycle: "2026-10", query: "market").map(\.id), [current.id])
+        let all = ledger.matchingEntries(cycle: nil, query: "  EXAMPLE market  ", includeVoided: true)
+        XCTAssertEqual(all.count, 3)
+        XCTAssertEqual(Ledger.netTotal(of: all), 2500)
+        XCTAssertEqual(ledger.matchingEntries(cycle: nil, query: "2026-09 20.00").map(\.id), [old.id])
+        XCTAssertEqual(ledger.matchingEntries(cycle: nil, query: "épicerie", displayText: { _ in "Épicerie" }).count, 2)
+        XCTAssertTrue(ledger.matchingEntries(cycle: nil, query: "missing").isEmpty)
+    }
     func testCalendarBoundariesAndLeapYears() {
         XCTAssertTrue(LedgerDate.valid("2000-02-29"))
         XCTAssertFalse(LedgerDate.valid("2100-02-29"))
