@@ -277,3 +277,18 @@ extension LedgerCoreTests {
         XCTAssertEqual(try Backup.decode(Backup.encode(ledger)), ledger)
     }
 }
+
+extension LedgerCoreTests {
+    func testEnglishBankStatementReviewBoundaries() {
+        let r = statement(["Bank of America", "Oct 25, 2026", "Example Cafe $12.34", "Example Market $5.67", "Payment received $18.01"])
+        XCTAssertEqual(r.rows.count, 3)
+        XCTAssertEqual(r.rows[0].merchant, "Example Cafe")
+        XCTAssertEqual(r.rows[0].date, "2026-10-25")
+        XCTAssertEqual(r.rows[0].amount, "12.34")
+        XCTAssertFalse(r.rows[0].explicitUSD)
+        XCTAssertNil(r.rows[0].blockedReason)
+        XCTAssertNotNil(r.rows[2].blockedReason)
+        let ambiguous = statement(["10/11/2026", "Example Cafe $12.34"])
+        XCTAssertEqual(ambiguous.rows[0].date, "")
+    }
+}

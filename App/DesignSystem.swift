@@ -51,6 +51,7 @@ struct LedgerMark: View {
 }
 struct LedgerCover: View {
     var animated = false
+    var onFinished: (() -> Void)? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var progress: CGFloat = 0
     @State private var subtitleVisible = false
@@ -66,11 +67,16 @@ struct LedgerCover: View {
                 }.opacity(subtitleVisible || !animated || reduceMotion ? 1 : 0)
             }.accessibilityElement(children: .ignore).accessibilityLabel("账本")
         }.task {
-            guard animated && !reduceMotion else { progress = 1; subtitleVisible = true; return }
-            withAnimation(.linear(duration: 1.3)) { progress = 1 }
-            try? await Task.sleep(for: .milliseconds(1300))
+            guard animated else { progress = 1; subtitleVisible = true; return }
+            guard !reduceMotion else { progress = 1; subtitleVisible = true; onFinished?(); return }
+            withAnimation(.linear(duration: 1.05)) { progress = 1 }
+            try? await Task.sleep(for: .milliseconds(1050))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeOut(duration: 0.25)) { subtitleVisible = true }
+            withAnimation(.easeOut(duration: 0.2)) { subtitleVisible = true }
+            // Allow the subtitle to finish fading in, then hold the complete lockup.
+            try? await Task.sleep(for: .milliseconds(850))
+            guard !Task.isCancelled else { return }
+            onFinished?()
         }
     }
 }
